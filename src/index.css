@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    color-scheme: dark;
+  }
+
+  body {
+    overscroll-behavior: none;
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  input, textarea, select, button {
+    font-size: 16px;
+  }
+
+  /* Prevent background flash on iOS when navigating */
+  html, body, #root {
+    background-color: #000;
+  }
+
+  /* Smooth scrolling for scroll containers */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255 255 255 / 0.1) transparent;
+  }
+
+  /* Prevent iOS autofill from flashing white */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #242424 inset !important;
+    -webkit-text-fill-color: white !important;
+    caret-color: white;
+  }
+
+  /* Selection color */
+  ::selection {
+    background: rgba(59, 130, 246, 0.4);
+    color: white;
+  }
+
+  /* iOS keyboard avoidance: when virtual keyboard opens, scroll inputs into view */
+  input:focus, textarea:focus {
+    scroll-margin-bottom: 120px;
+  }
+
+  /* Prevent iOS rubber-band bounce on fixed containers */
+  .no-bounce {
+    overscroll-behavior: contain;
+  }
+
+  /* iOS standalone mode: additional top padding for status bar */
+  @media all and (display-mode: standalone) {
+    body {
+      padding-top: env(safe-area-inset-top);
+    }
+  }
+}
+
+@layer utilities {
+  /* Page enter animation */
+  .page-enter {
+    animation: pageSlideIn 0.2s ease-out;
+  }
+
+  @keyframes pageSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Set completion checkmark animation */
+  .set-check {
+    animation: setCheck 0.3s ease-out;
+  }
+
+  @keyframes setCheck {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+}

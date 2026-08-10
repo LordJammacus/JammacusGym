@@ -1,0 +1,27 @@
+export { estimateOneRepMax, buildExerciseProgression, calculateVolumeLoad } from './intensity';
+export { calculateMuscleGroupVolume, calculateWeeklyVolume, calculateRollingVolume, calculateTotalVolume } from './volume';
+export { calculateWeeklyFrequency, calculateWorkoutDurations, calculateAverageFrequency } from './frequency';
+export { calculateRestAdherence } from './rest';
+export { detectPersonalRecords } from './records';
+export { calculatePerformanceTrend, detectStagnation } from './performance';
+export {
+  buildFatigueTimeline,
+  correlateFatigueWithPerformance,
+  estimateMuscleRecovery,
+  detectWorkoutSequenceInsights,
+} from './fatigue';
+export type {
+  FatigueSnapshot,
+  FatiguePerformanceCorrelation,
+  MuscleRecoveryEstimate,
+  WorkoutSequenceInsight,
+} from './fatigue';
+export {
+  generateBlockSummary,
+  suggestNextBlock,
+} from './blockSummary';
+export type {
+  BlockSummary,
+  ExerciseSummary,
+  NextBlockSuggestion,
+} from './blockSummary';
