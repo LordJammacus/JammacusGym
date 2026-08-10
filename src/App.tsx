@@ -22,7 +22,7 @@ export function App() {
 
   return (
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename="/JammacusGym">
         <OfflineIndicator />
         <PWAUpdatePrompt />
         {showOnboarding ? (
