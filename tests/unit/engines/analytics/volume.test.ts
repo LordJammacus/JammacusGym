@@ -3,6 +3,7 @@ import {
   calculateMuscleGroupVolume,
   calculateTotalVolume,
   calculateWeeklyVolume,
+  calculatePrimaryMuscleSets,
 } from '@/engines/analytics/volume';
 import { buildExerciseProgression } from '@/engines/analytics/intensity';
 import type {
@@ -69,6 +70,42 @@ describe('calculateMuscleGroupVolume', () => {
     const result = calculateMuscleGroupVolume(sets, exerciseInstances, exerciseMuscles, muscleNames);
     expect(result).toHaveLength(1);
     expect(result[0]!.directSets).toBe(1);
+  });
+});
+
+describe('calculatePrimaryMuscleSets', () => {
+  it('counts one set per primary muscle with no fractional secondaries', () => {
+    const exerciseInstances: WorkoutExerciseInstance[] = [
+      makeEI('ei-1', 'ex-hammer'),
+      makeEI('ei-2', 'ex-row'),
+    ];
+    const sets: CompletedSet[] = [
+      makeSet('s1', 'ei-1', 20, 12),
+      makeSet('s2', 'ei-1', 20, 12),
+      makeSet('s3', 'ei-2', 40, 10),
+      makeSet('s4', 'ei-2', 40, 10),
+      makeSet('s5', 'ei-2', 40, 10),
+      makeSet('s6', 'ei-2', 40, 10),
+    ];
+    const exerciseMuscles: ExerciseMuscle[] = [
+      { id: 'em-1', exerciseId: 'ex-hammer', muscleGroupId: 'mg-biceps', role: 'primary', contribution: 0.8 },
+      { id: 'em-2', exerciseId: 'ex-hammer', muscleGroupId: 'mg-forearms', role: 'secondary', contribution: 0.5 },
+      { id: 'em-3', exerciseId: 'ex-row', muscleGroupId: 'mg-lats', role: 'primary', contribution: 0.8 },
+      { id: 'em-4', exerciseId: 'ex-row', muscleGroupId: 'mg-upper-back', role: 'primary', contribution: 0.6 },
+    ];
+    const muscleNames = new Map([
+      ['mg-biceps', 'Biceps'],
+      ['mg-forearms', 'Forearms'],
+      ['mg-lats', 'Lats'],
+      ['mg-upper-back', 'Upper Back'],
+    ]);
+
+    const result = calculatePrimaryMuscleSets(sets, exerciseInstances, exerciseMuscles, muscleNames);
+
+    expect(result.find(r => r.muscleName === 'Forearms')).toBeUndefined();
+    expect(result.find(r => r.muscleName === 'Biceps')!.totalWeightedSets).toBe(2);
+    expect(result.find(r => r.muscleName === 'Upper Back')!.totalWeightedSets).toBe(4);
+    expect(result.find(r => r.muscleName === 'Lats')!.totalWeightedSets).toBe(4);
   });
 });
 

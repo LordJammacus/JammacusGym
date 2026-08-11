@@ -12,7 +12,11 @@ export async function getProgram(id: string): Promise<Program | undefined> {
 }
 
 export async function getActiveProgram(): Promise<Program | undefined> {
-  return db.programs.where('isActive').equals(1).first();
+  // Don't use where('isActive').equals(1) — IndexedDB stores JS booleans as
+  // true/false, not 1/0, so the numeric index lookup misses active programs.
+  return db.programs
+    .filter(p => p.isActive === true && p.archivedAt === null)
+    .first();
 }
 
 export async function createProgram(program: Program): Promise<void> {
@@ -33,11 +37,14 @@ export async function archiveProgram(id: string): Promise<void> {
 
 export async function setActiveProgram(id: string): Promise<void> {
   await db.transaction('rw', db.programs, async () => {
-    const allActive = await db.programs.where('isActive').equals(1).toArray();
-    for (const p of allActive) {
-      await db.programs.update(p.id, { isActive: false, updatedAt: new Date().toISOString() });
+    const all = await db.programs.toArray();
+    const now = new Date().toISOString();
+    for (const p of all) {
+      if (p.isActive) {
+        await db.programs.update(p.id, { isActive: false, updatedAt: now });
+      }
     }
-    await db.programs.update(id, { isActive: true, updatedAt: new Date().toISOString() });
+    await db.programs.update(id, { isActive: true, updatedAt: now });
   });
 }
 

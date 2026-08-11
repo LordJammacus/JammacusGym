@@ -3,7 +3,8 @@ import type { WorkoutInstance, WorkoutExerciseInstance, CompletedSet, ExerciseMu
 import type { Program, TrainingBlock, BlockWorkout } from '@/types/entities';
 import type { DayOfWeek } from '@/types/enums';
 import {
-  calculateMuscleGroupVolume,
+  calculatePrimaryMuscleSets,
+  filterSetsToDateRange,
   calculateRollingVolume,
   calculatePerformanceTrend,
   detectStagnation,
@@ -36,14 +37,25 @@ export function buildTrainingContext(input: ContextInput): TrainingContext {
   const now = input.now ?? new Date().toISOString();
   const nowMs = new Date(now).getTime();
 
+  const dateRange7d: DateRange = {
+    start: new Date(nowMs - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    end: now,
+  };
   const dateRange28d: DateRange = {
     start: new Date(nowMs - 28 * 24 * 60 * 60 * 1000).toISOString(),
     end: now,
   };
 
-  const muscleVolume = calculateMuscleGroupVolume(
+  // True 7-day primary-set counts for volume recommendations (no fractional spillover).
+  const weekData = filterSetsToDateRange(
     input.allSets,
     input.exerciseInstances,
+    input.recentWorkouts,
+    dateRange7d,
+  );
+  const muscleVolume = calculatePrimaryMuscleSets(
+    weekData.sets,
+    weekData.exerciseInstances,
     input.exerciseMuscles,
     input.muscleNames,
   );

@@ -42,6 +42,66 @@ export function calculateMuscleGroupVolume(
   })).sort((a, b) => b.totalWeightedSets - a.totalWeightedSets);
 }
 
+/**
+ * Counts working sets per muscle where that muscle is a primary target (1 set = 1).
+ * Used for user-facing volume recommendations — no fractional secondary spillover.
+ */
+export function calculatePrimaryMuscleSets(
+  sets: CompletedSet[],
+  exerciseInstances: WorkoutExerciseInstance[],
+  exerciseMuscles: ExerciseMuscle[],
+  muscleNames: Map<string, string>,
+): MuscleVolumeEntry[] {
+  const volumeMap = new Map<string, number>();
+
+  const eiMap = new Map<string, string>();
+  for (const ei of exerciseInstances) {
+    eiMap.set(ei.id, ei.exerciseId);
+  }
+
+  for (const set of sets) {
+    if (set.setType === 'warmup') continue;
+
+    const exerciseId = eiMap.get(set.workoutExerciseInstanceId);
+    if (!exerciseId) continue;
+
+    const primaries = exerciseMuscles.filter(
+      em => em.exerciseId === exerciseId && em.role === 'primary',
+    );
+    for (const muscle of primaries) {
+      volumeMap.set(muscle.muscleGroupId, (volumeMap.get(muscle.muscleGroupId) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(volumeMap.entries()).map(([muscleGroupId, setsCount]) => ({
+    muscleGroupId,
+    muscleName: muscleNames.get(muscleGroupId) ?? 'Unknown',
+    directSets: setsCount,
+    indirectSets: 0,
+    totalWeightedSets: setsCount,
+  })).sort((a, b) => b.totalWeightedSets - a.totalWeightedSets);
+}
+
+/** Keep only sets belonging to completed workouts inside the date range. */
+export function filterSetsToDateRange(
+  sets: CompletedSet[],
+  exerciseInstances: WorkoutExerciseInstance[],
+  instances: WorkoutInstance[],
+  dateRange: DateRange,
+): { sets: CompletedSet[]; exerciseInstances: WorkoutExerciseInstance[] } {
+  const allowedInstanceIds = new Set(
+    completedWorkoutsOnly(instances)
+      .filter(i => i.startedAt >= dateRange.start && i.startedAt <= dateRange.end)
+      .map(i => i.id),
+  );
+  const filteredEis = exerciseInstances.filter(ei => allowedInstanceIds.has(ei.workoutInstanceId));
+  const eiIds = new Set(filteredEis.map(ei => ei.id));
+  return {
+    sets: sets.filter(s => eiIds.has(s.workoutExerciseInstanceId)),
+    exerciseInstances: filteredEis,
+  };
+}
+
 export function calculateWeeklyVolume(
   sets: CompletedSet[],
   instances: WorkoutInstance[],

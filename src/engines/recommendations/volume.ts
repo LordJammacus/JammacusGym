@@ -1,8 +1,7 @@
 import type { Recommendation, RecommendationSource, TrainingContext } from '@/types/recommendations';
 import { generateId } from '@/utils/ids';
 
-// Evidence-based weekly set ranges per muscle group (working sets).
-// Based on commonly cited guidelines: 10-20 sets/week for most muscles.
+// Evidence-based weekly set ranges for muscles trained as a primary target.
 const VOLUME_THRESHOLDS = {
   low: 6,
   adequate: 10,
@@ -13,8 +12,7 @@ const VOLUME_THRESHOLDS = {
 /**
  * VolumeRecommender: Is muscle-group weekly volume appropriate?
  *
- * Compares 7-day rolling muscle-group volume against evidence-based thresholds.
- * Flags under-trained and over-trained muscle groups.
+ * Uses whole primary-target sets over the last 7 days (from TrainingContext.muscleVolume).
  */
 export const volumeRecommender: RecommendationSource = {
   id: 'volume',
@@ -29,9 +27,11 @@ export const volumeRecommender: RecommendationSource = {
     const highVolumeMuscles: { name: string; sets: number }[] = [];
 
     for (const entry of ctx.muscleVolume) {
-      const weeklySets = entry.totalWeightedSets;
+      // Prefer integer primary sets; ignore secondary-only spillover (0 direct).
+      const weeklySets = Math.round(entry.directSets);
+      if (weeklySets < 1) continue;
 
-      if (weeklySets > 0 && weeklySets < VOLUME_THRESHOLDS.low) {
+      if (weeklySets < VOLUME_THRESHOLDS.low) {
         lowVolumeMuscles.push({ name: entry.muscleName, sets: weeklySets });
       } else if (weeklySets > VOLUME_THRESHOLDS.excessive) {
         highVolumeMuscles.push({ name: entry.muscleName, sets: weeklySets });
@@ -46,7 +46,7 @@ export const volumeRecommender: RecommendationSource = {
         type: 'volume',
         priority: 'medium',
         title: 'Low volume detected',
-        reasoning: `${muscles.map(m => `${m.name} (${m.sets} sets)`).join(', ')} are below the minimum effective volume of ${VOLUME_THRESHOLDS.low} sets/week.`,
+        reasoning: `${muscles.map(m => `${m.name} (${m.sets} ${m.sets === 1 ? 'set' : 'sets'})`).join(', ')} ${muscles.length === 1 ? 'is' : 'are'} below the minimum effective volume of ${VOLUME_THRESHOLDS.low} sets/week.`,
         suggestedAction: 'Add more sets for these muscle groups or include additional exercises targeting them.',
         confidence: 0.7,
         supportingData: { lowVolumeMuscles: muscles, threshold: VOLUME_THRESHOLDS.low },
@@ -70,13 +70,13 @@ export const volumeRecommender: RecommendationSource = {
       });
     }
 
-    // Imbalance detection: push/pull ratio
+    // Imbalance detection: push/pull ratio (whole primary sets)
     const pushVolume = ctx.muscleVolume
       .filter(m => isPushMuscle(m.muscleName))
-      .reduce((sum, m) => sum + m.totalWeightedSets, 0);
+      .reduce((sum, m) => sum + Math.round(m.directSets), 0);
     const pullVolume = ctx.muscleVolume
       .filter(m => isPullMuscle(m.muscleName))
-      .reduce((sum, m) => sum + m.totalWeightedSets, 0);
+      .reduce((sum, m) => sum + Math.round(m.directSets), 0);
 
     if (pushVolume > 0 && pullVolume > 0) {
       const ratio = pushVolume / pullVolume;
@@ -86,10 +86,10 @@ export const volumeRecommender: RecommendationSource = {
           type: 'volume',
           priority: 'medium',
           title: 'Push/pull imbalance',
-          reasoning: `Push volume (${Math.round(pushVolume)} sets) significantly exceeds pull volume (${Math.round(pullVolume)} sets). Ratio: ${ratio.toFixed(1)}:1.`,
+          reasoning: `Push volume (${pushVolume} sets) significantly exceeds pull volume (${pullVolume} sets). Ratio: ${ratio.toFixed(1)}:1.`,
           suggestedAction: 'Add more pulling exercises (rows, pull-ups) to balance your training.',
           confidence: 0.65,
-          supportingData: { pushVolume: Math.round(pushVolume), pullVolume: Math.round(pullVolume), ratio: Math.round(ratio * 10) / 10 },
+          supportingData: { pushVolume, pullVolume, ratio: Math.round(ratio * 10) / 10 },
           createdAt: now,
         });
       } else if (ratio < 0.55) {
@@ -98,10 +98,10 @@ export const volumeRecommender: RecommendationSource = {
           type: 'volume',
           priority: 'medium',
           title: 'Pull/push imbalance',
-          reasoning: `Pull volume (${Math.round(pullVolume)} sets) significantly exceeds push volume (${Math.round(pushVolume)} sets). Ratio: ${(1 / ratio).toFixed(1)}:1.`,
+          reasoning: `Pull volume (${pullVolume} sets) significantly exceeds push volume (${pushVolume} sets). Ratio: ${(1 / ratio).toFixed(1)}:1.`,
           suggestedAction: 'Add more pushing exercises (bench, overhead press) to balance your training.',
           confidence: 0.65,
-          supportingData: { pushVolume: Math.round(pushVolume), pullVolume: Math.round(pullVolume), ratio: Math.round(ratio * 10) / 10 },
+          supportingData: { pushVolume, pullVolume, ratio: Math.round(ratio * 10) / 10 },
           createdAt: now,
         });
       }
@@ -117,6 +117,6 @@ function isPushMuscle(name: string): boolean {
 }
 
 function isPullMuscle(name: string): boolean {
-  const pull = ['back', 'biceps', 'rear delt', 'posterior deltoid', 'lats', 'rhomboids', 'traps'];
+  const pull = ['back', 'lats', 'biceps', 'rear delt', 'posterior deltoid', 'rhomboids', 'traps'];
   return pull.some(p => name.toLowerCase().includes(p));
 }

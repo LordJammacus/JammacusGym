@@ -46,8 +46,8 @@ export function makeVolume(
   return {
     muscleGroupId,
     muscleName,
-    directSets: totalWeightedSets * 0.8,
-    indirectSets: totalWeightedSets * 0.2,
+    directSets: totalWeightedSets,
+    indirectSets: 0,
     totalWeightedSets,
   };
 }

@@ -1,5 +1,5 @@
 export { estimateOneRepMax, buildExerciseProgression, calculateVolumeLoad } from './intensity';
-export { calculateMuscleGroupVolume, calculateWeeklyVolume, calculateRollingVolume, calculateTotalVolume } from './volume';
+export { calculateMuscleGroupVolume, calculatePrimaryMuscleSets, filterSetsToDateRange, calculateWeeklyVolume, calculateRollingVolume, calculateTotalVolume } from './volume';
 export { calculateWeeklyFrequency, calculateWorkoutDurations, calculateAverageFrequency } from './frequency';
 export { calculateRestAdherence } from './rest';
 export { detectPersonalRecords } from './records';

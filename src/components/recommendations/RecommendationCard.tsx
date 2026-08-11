@@ -7,12 +7,12 @@ interface RecommendationCardProps {
   compact?: boolean;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  schedule: '📅',
-  volume: '📊',
-  deload: '⏸',
-  exercise: '💪',
-  intensity: '🔥',
+const TYPE_LABELS: Record<string, string> = {
+  schedule: 'Schedule',
+  volume: 'Volume',
+  deload: 'Recovery',
+  exercise: 'Exercise',
+  intensity: 'Intensity',
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
@@ -26,15 +26,15 @@ export function RecommendationCard({
   onRespond,
   compact = false,
 }: RecommendationCardProps) {
-  const icon = TYPE_ICONS[rec.type] ?? '💡';
+  const typeLabel = TYPE_LABELS[rec.type] ?? 'Tip';
   const borderStyle = PRIORITY_STYLES[rec.priority] ?? '';
 
   return (
     <Card className={`border-l-4 ${borderStyle} space-y-2`}>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg shrink-0" role="img">{icon}</span>
-          <h3 className="font-semibold text-white text-sm truncate">{rec.title}</h3>
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-wide text-zinc-500 mb-0.5">{typeLabel}</p>
+          <h3 className="font-semibold text-white text-sm leading-snug">{rec.title}</h3>
         </div>
         <ConfidenceBadge value={rec.confidence} />
       </div>

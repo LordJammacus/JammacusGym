@@ -73,7 +73,7 @@ export async function seedStarterProgram(): Promise<void> {
     ],
     async () => {
       // Don't steal the active slot if the user already has a program.
-      const hasActive = (await db.programs.where('isActive').equals(1).count()) > 0;
+      const hasActive = (await db.programs.filter(p => p.isActive === true).count()) > 0;
       if (hasActive) {
         data.program.isActive = false;
       }
