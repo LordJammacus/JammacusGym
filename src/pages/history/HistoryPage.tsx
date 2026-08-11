@@ -17,7 +17,7 @@ export function HistoryPage() {
 
   useEffect(() => {
     const load = async () => {
-      const instances = await instancesRepo.getCompletedWorkouts();
+      const instances = await instancesRepo.getHistoryWorkouts();
       const summaries: WorkoutSummary[] = [];
 
       for (const inst of instances) {

@@ -5,6 +5,7 @@ import { RestTimer } from '@/components/workout/RestTimer';
 import type { SetTarget, WorkoutInstance, WorkoutExerciseInstance, CompletedSet, ProgressionRule, Note } from '@/types/entities';
 import type { PersonalRecord } from '@/types/analytics';
 import type { ProgressionResult } from '@/engines/progression/types';
+import type { WeightUnit } from '@/types/enums';
 import * as workoutsRepo from '@/db/repositories/workouts';
 import * as exercisesRepo from '@/db/repositories/exercises';
 import * as instancesRepo from '@/db/repositories/instances';
@@ -15,6 +16,7 @@ import { calculateProgression } from '@/engines/progression';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { generateId } from '@/utils/ids';
 import { haptic } from '@/utils/haptics';
+import { formatVolume, formatWeight, roundToIncrement } from '@/utils/units';
 
 export function StartWorkoutPage() {
   const { templateId } = useParams<{ templateId: string }>();
@@ -201,9 +203,25 @@ export function ActiveWorkoutPage() {
   const [postNote, setPostNote] = useState('');
   const [showSubstitute, setShowSubstitute] = useState(false);
   const [setFlash, setSetFlash] = useState(false);
+  const [units, setUnits] = useState<WeightUnit>('kg');
+  const [weightIncrement, setWeightIncrement] = useState(2.5);
+  const [summary, setSummary] = useState<{
+    setCount: number;
+    volume: number;
+    exerciseCount: number;
+    duration: number;
+  } | null>(null);
 
   useEffect(() => {
-    if (!instance) { navigate('/workout', { replace: true }); return; }
+    getSettings().then(s => {
+      setUnits(s.units);
+      setWeightIncrement(s.weightIncrement);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!instance && !showSummary) { navigate('/workout', { replace: true }); return; }
+    if (!instance) return;
     const loadNames = async () => {
       const names = new Map<string, string>();
       for (const ei of exerciseInstances) {
@@ -215,7 +233,7 @@ export function ActiveWorkoutPage() {
       setExerciseNames(names);
     };
     loadNames();
-  }, [instance, exerciseInstances, navigate]);
+  }, [instance, exerciseInstances, navigate, showSummary]);
 
   // Load previous workout data
   useEffect(() => {
@@ -290,14 +308,6 @@ export function ActiveWorkoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentExerciseIndex, currentSetIdx]);
 
-  if (!instance || !currentExercise) return null;
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
-
   const handleCompleteSet = useCallback(async () => {
     haptic('success');
     setSetFlash(true);
@@ -306,15 +316,37 @@ export function ActiveWorkoutPage() {
     setSetType('working');
   }, [weight, reps, setType, completeSet]);
 
+  const handleAbandon = useCallback(async () => {
+    setShowAbandon(false);
+    await abandonWorkout();
+    navigate('/workout', { replace: true });
+  }, [abandonWorkout, navigate]);
+
+  if ((!instance || !currentExercise) && !showSummary) return null;
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
   const handleFinish = async () => {
+    if (!instance) return;
     setShowFinish(false);
     haptic('heavy');
+    const snapshot = {
+      setCount: completedSets.length,
+      volume: completedSets.reduce((acc, s) => acc + s.actualWeight * s.actualReps, 0),
+      exerciseCount: exerciseInstances.length,
+      duration: elapsed,
+    };
+    const instanceId = instance.id;
     await finishWorkout();
-    if (postNote.trim() && instance) {
+    if (postNote.trim()) {
       await notesRepo.createNote({
         id: generateId(),
         type: 'workout_instance',
-        targetId: instance.id,
+        targetId: instanceId,
         content: postNote.trim(),
         showNextTime: false,
         createdAt: new Date().toISOString(),
@@ -322,21 +354,65 @@ export function ActiveWorkoutPage() {
         archivedAt: null,
       });
     }
+    setSummary(snapshot);
     setShowSummary(true);
   };
 
-  const handleAbandon = async () => {
-    await abandonWorkout();
-    navigate('/workout', { replace: true });
-  };
+  if (showSummary && summary) {
+    return (
+      <Modal
+        open
+        onClose={() => { setShowSummary(false); dismissPRs(); navigate('/history', { replace: true }); }}
+        title="Workout Complete!"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div>
+              <p className="text-2xl font-bold">{formatTime(summary.duration)}</p>
+              <p className="text-xs text-zinc-400">Duration</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{summary.setCount}</p>
+              <p className="text-xs text-zinc-400">Sets</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{formatVolume(summary.volume, units)}</p>
+              <p className="text-xs text-zinc-400">Volume</p>
+            </div>
+          </div>
+          <div className="text-sm text-zinc-400 text-center">
+            {summary.exerciseCount} exercise{summary.exerciseCount !== 1 ? 's' : ''}
+          </div>
+          {newPRs.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-amber-400 text-center">Personal Records!</h3>
+              <div className="space-y-1">
+                {deduplicatePRsForDisplay(newPRs).map(pr => (
+                  <div key={pr.id} className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2">
+                    <span className="text-amber-400 text-sm">PR</span>
+                    <span className="text-sm text-zinc-200 flex-1">
+                      {exerciseNames.get(pr.exerciseId) ?? 'Exercise'} — {formatPRType(pr.type)}: {formatPRValue(pr, units)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <Button className="w-full" onClick={() => { setShowSummary(false); dismissPRs(); navigate('/history', { replace: true }); }}>
+            Done
+          </Button>
+        </div>
+      </Modal>
+    );
+  }
+
+  if (!instance || !currentExercise) return null;
 
   const allSetsComplete = exerciseInstances.every((ei, idx) => {
     const targets = setTargets[idx] ?? [];
     const done = completedSets.filter(s => s.workoutExerciseInstanceId === ei.id);
     return done.length >= targets.length;
   });
-
-  const totalVolume = completedSets.reduce((acc, s) => acc + s.actualWeight * s.actualReps, 0);
 
   const prevExerciseSets = previousSets.get(currentExercise.exerciseId);
   const currentProgression = progressionResults?.[currentExerciseIndex] ?? null;
@@ -348,6 +424,10 @@ export function ActiveWorkoutPage() {
     maintain: 'bg-zinc-800/60 text-zinc-400 border-zinc-700/50',
     manual: 'bg-zinc-800/40 text-zinc-500 border-zinc-700/50',
   };
+
+  const warmupSuggestion = currentTarget?.targetWeight
+    ? roundToIncrement(currentTarget.targetWeight * 0.5, weightIncrement)
+    : null;
 
   return (
     <div className="flex flex-col h-full relative">
@@ -467,10 +547,10 @@ export function ActiveWorkoutPage() {
         {/* Weight control */}
         <Card>
           <div className="flex items-center justify-between">
-            <span className="text-zinc-400 text-sm">Weight (kg)</span>
+            <span className="text-zinc-400 text-sm">Weight ({units})</span>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setWeight(Math.max(0, weight - 2.5))}
+                onClick={() => setWeight(Math.max(0, roundToIncrement(weight - weightIncrement, weightIncrement)))}
                 aria-label="Decrease weight"
                 className="w-11 h-11 rounded-full bg-surface-overlay flex items-center justify-center text-xl font-bold active:bg-surface"
               >−</button>
@@ -484,7 +564,7 @@ export function ActiveWorkoutPage() {
                 className="w-20 text-center text-2xl font-bold bg-transparent text-white"
               />
               <button
-                onClick={() => setWeight(weight + 2.5)}
+                onClick={() => setWeight(roundToIncrement(weight + weightIncrement, weightIncrement))}
                 aria-label="Increase weight"
                 className="w-11 h-11 rounded-full bg-surface-overlay flex items-center justify-center text-xl font-bold active:bg-surface"
               >+</button>
@@ -541,18 +621,16 @@ export function ActiveWorkoutPage() {
         </div>
 
         {/* Auto warm-up suggestion */}
-        {currentSetIdx === 0 && currentTarget?.targetWeight && currentTarget.targetWeight >= 40 && (
+        {currentSetIdx === 0 && currentTarget?.targetWeight && warmupSuggestion != null && currentTarget.targetWeight >= weightIncrement * 8 && (
           <button
             onClick={() => {
               setSetType('warmup');
-              const workingWeight = currentTarget.targetWeight!;
-              const warmupWeight = Math.round((workingWeight * 0.5) / 2.5) * 2.5;
-              setWeight(warmupWeight);
+              setWeight(warmupSuggestion);
               setReps(Math.min(10, currentTarget.targetRepMax));
             }}
             className="w-full text-center text-xs text-amber-400 py-2 rounded-lg border border-amber-800/30 bg-amber-900/10"
           >
-            Suggest warm-up: {Math.round((currentTarget.targetWeight * 0.5) / 2.5) * 2.5}kg × {Math.min(10, currentTarget.targetRepMax)} reps
+            Suggest warm-up: {formatWeight(warmupSuggestion, units)} × {Math.min(10, currentTarget.targetRepMax)} reps
           </button>
         )}
 
@@ -581,7 +659,7 @@ export function ActiveWorkoutPage() {
                       }`}>({s.setType})</span>
                     )}
                   </span>
-                  <span>{s.actualWeight}kg × {s.actualReps}</span>
+                  <span>{formatWeight(s.actualWeight, units)} × {s.actualReps}</span>
                 </div>
               ))}
             </div>
@@ -596,7 +674,7 @@ export function ActiveWorkoutPage() {
               {prevExerciseSets.map((s, i) => (
                 <div key={s.id} className="flex justify-between text-sm text-zinc-500">
                   <span>Set {i + 1}</span>
-                  <span>{s.actualWeight}kg × {s.actualReps}</span>
+                  <span>{formatWeight(s.actualWeight, units)} × {s.actualReps}</span>
                 </div>
               ))}
             </div>
@@ -648,51 +726,12 @@ export function ActiveWorkoutPage() {
         </div>
       </Modal>
 
-      {/* Workout summary modal */}
-      <Modal open={showSummary} onClose={() => { setShowSummary(false); dismissPRs(); navigate('/history', { replace: true }); }} title="Workout Complete!">
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div>
-              <p className="text-2xl font-bold">{formatTime(elapsed)}</p>
-              <p className="text-xs text-zinc-400">Duration</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{completedSets.length}</p>
-              <p className="text-xs text-zinc-400">Sets</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}t` : `${totalVolume}kg`}</p>
-              <p className="text-xs text-zinc-400">Volume</p>
-            </div>
-          </div>
-          <div className="text-sm text-zinc-400 text-center">
-            {exerciseInstances.length} exercise{exerciseInstances.length !== 1 ? 's' : ''}
-          </div>
-          {newPRs.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-amber-400 text-center">Personal Records!</h3>
-              <div className="space-y-1">
-                {deduplicatePRsForDisplay(newPRs).map(pr => (
-                  <div key={pr.id} className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2">
-                    <span className="text-amber-400 text-sm">PR</span>
-                    <span className="text-sm text-zinc-200 flex-1">
-                      {exerciseNames.get(pr.exerciseId) ?? 'Exercise'} — {formatPRType(pr.type)}: {formatPRValue(pr)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <Button className="w-full" onClick={() => { setShowSummary(false); dismissPRs(); navigate('/history', { replace: true }); }}>
-            Done
-          </Button>
-        </div>
-      </Modal>
-
       {/* Abandon modal */}
       <Modal open={showAbandon} onClose={() => setShowAbandon(false)} title="Abandon Workout?">
         <div className="space-y-4">
-          <p className="text-zinc-300">Sets already logged will be saved but the workout will be marked as abandoned.</p>
+          <p className="text-zinc-300">
+            Logged sets stay in History for your records, but abandoned workouts are ignored for analytics, progression, and recommendations.
+          </p>
           <div className="flex gap-3">
             <Button variant="secondary" className="flex-1" onClick={() => setShowAbandon(false)}>Cancel</Button>
             <Button variant="danger" className="flex-1" onClick={handleAbandon}>Abandon</Button>
@@ -727,13 +766,13 @@ function formatPRType(type: PersonalRecord['type']): string {
   }
 }
 
-function formatPRValue(pr: PersonalRecord): string {
+function formatPRValue(pr: PersonalRecord, units: WeightUnit): string {
   switch (pr.type) {
-    case 'weight': return `${pr.value}kg`;
+    case 'weight': return formatWeight(pr.value, units);
     case 'reps': return `${pr.value} reps`;
-    case 'volume': return `${pr.value >= 1000 ? (pr.value / 1000).toFixed(1) + 't' : pr.value + 'kg'}`;
-    case 'estimated_1rm': return `${pr.value}kg`;
-    case 'reps_at_weight': return `${pr.reps} @ ${pr.weight}kg`;
+    case 'volume': return formatVolume(pr.value, units);
+    case 'estimated_1rm': return formatWeight(pr.value, units);
+    case 'reps_at_weight': return `${pr.reps} @ ${formatWeight(pr.weight ?? 0, units)}`;
   }
 }
 

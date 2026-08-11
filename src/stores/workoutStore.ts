@@ -244,9 +244,14 @@ export const useWorkoutStore = create<WorkoutState>()(
         const state = get();
         if (!state.instance) return;
 
+        const durationSeconds = state.workoutStartTime
+          ? Math.round((Date.now() - state.workoutStartTime) / 1000)
+          : null;
+
         await instancesRepo.updateWorkoutInstance(state.instance.id, {
           status: 'abandoned',
           completedAt: new Date().toISOString(),
+          durationSeconds,
         });
 
         set(initialState);

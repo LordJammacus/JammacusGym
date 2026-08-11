@@ -1,5 +1,6 @@
 import type { WorkoutInstance } from '@/types/entities';
 import type { FrequencyPoint, WorkoutDurationPoint, DateRange } from '@/types/analytics';
+import { completedWorkoutsOnly } from './completedOnly';
 
 export function calculateWeeklyFrequency(
   instances: WorkoutInstance[],
@@ -8,8 +9,7 @@ export function calculateWeeklyFrequency(
 ): FrequencyPoint[] {
   const weekBuckets = new Map<string, number>();
 
-  for (const inst of instances) {
-    if (inst.status !== 'completed') continue;
+  for (const inst of completedWorkoutsOnly(instances)) {
     if (inst.startedAt < dateRange.start || inst.startedAt > dateRange.end) continue;
 
     const date = new Date(inst.startedAt);
@@ -27,9 +27,8 @@ export function calculateWorkoutDurations(
   instances: WorkoutInstance[],
   dateRange: DateRange,
 ): WorkoutDurationPoint[] {
-  return instances
+  return completedWorkoutsOnly(instances)
     .filter(inst =>
-      inst.status === 'completed' &&
       inst.durationSeconds != null &&
       inst.startedAt >= dateRange.start &&
       inst.startedAt <= dateRange.end,
@@ -45,8 +44,7 @@ export function calculateAverageFrequency(
   instances: WorkoutInstance[],
   dateRange: DateRange,
 ): number {
-  const completed = instances.filter(inst =>
-    inst.status === 'completed' &&
+  const completed = completedWorkoutsOnly(instances).filter(inst =>
     inst.startedAt >= dateRange.start &&
     inst.startedAt <= dateRange.end,
   );

@@ -1,5 +1,6 @@
 import type { CompletedSet, ExerciseMuscle, WorkoutInstance, WorkoutExerciseInstance } from '@/types/entities';
 import type { MuscleVolumeEntry, WeeklyVolumePoint, RollingVolumeResult, DateRange } from '@/types/analytics';
+import { completedWorkoutsOnly } from './completedOnly';
 
 export function calculateMuscleGroupVolume(
   sets: CompletedSet[],
@@ -54,7 +55,7 @@ export function calculateWeeklyVolume(
   }
 
   const instanceDates = new Map<string, string>();
-  for (const inst of instances) {
+  for (const inst of completedWorkoutsOnly(instances)) {
     instanceDates.set(inst.id, inst.startedAt);
   }
 
@@ -101,7 +102,7 @@ export function calculateRollingVolume(
   }
 
   const instanceDates = new Map<string, string>();
-  for (const inst of instances) {
+  for (const inst of completedWorkoutsOnly(instances)) {
     instanceDates.set(inst.id, inst.startedAt);
   }
 

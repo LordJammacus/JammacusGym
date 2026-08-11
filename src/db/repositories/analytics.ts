@@ -2,6 +2,10 @@ import { db } from '../database';
 import type { CompletedSet, WorkoutInstance, WorkoutExerciseInstance, ExerciseMuscle } from '@/types/entities';
 import type { DateRange } from '@/types/analytics';
 
+/**
+ * Completed workouts only. Abandoned sessions are history/UI-only and must never
+ * be passed into analytics, progression, or recommendation engines.
+ */
 export async function getCompletedInstances(dateRange?: DateRange): Promise<WorkoutInstance[]> {
   let query = db.workoutInstances.where('status').equals('completed');
   if (dateRange) {

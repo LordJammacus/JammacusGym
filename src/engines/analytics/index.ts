@@ -4,6 +4,7 @@ export { calculateWeeklyFrequency, calculateWorkoutDurations, calculateAverageFr
 export { calculateRestAdherence } from './rest';
 export { detectPersonalRecords } from './records';
 export { calculatePerformanceTrend, detectStagnation } from './performance';
+export { completedWorkoutsOnly, completedWorkoutIdSet } from './completedOnly';
 export {
   buildFatigueTimeline,
   correlateFatigueWithPerformance,

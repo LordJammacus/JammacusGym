@@ -1,5 +1,6 @@
 import type { CompletedSet, WorkoutExerciseInstance, WorkoutInstance } from '@/types/entities';
 import type { ExerciseProgressionPoint } from '@/types/analytics';
+import { completedWorkoutsOnly } from './completedOnly';
 
 /**
  * Epley formula: 1RM = weight × (1 + reps / 30)
@@ -27,7 +28,7 @@ export function buildExerciseProgression(
   exerciseId: string,
 ): ExerciseProgressionPoint[] {
   const instanceDateMap = new Map<string, string>();
-  for (const inst of instances) {
+  for (const inst of completedWorkoutsOnly(instances)) {
     instanceDateMap.set(inst.id, inst.startedAt);
   }
 

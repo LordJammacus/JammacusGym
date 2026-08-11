@@ -17,12 +17,17 @@ export async function getInProgressWorkout(): Promise<WorkoutInstance | undefine
   return db.workoutInstances.where('status').equals('in_progress').first();
 }
 
-export async function getCompletedWorkouts(): Promise<WorkoutInstance[]> {
+export async function getHistoryWorkouts(): Promise<WorkoutInstance[]> {
   return db.workoutInstances
     .where('status')
     .anyOf(['completed', 'abandoned'])
     .reverse()
     .sortBy('startedAt');
+}
+
+/** @deprecated Use getHistoryWorkouts — name was misleading (includes abandoned). */
+export async function getCompletedWorkouts(): Promise<WorkoutInstance[]> {
+  return getHistoryWorkouts();
 }
 
 export async function createExerciseInstances(instances: WorkoutExerciseInstance[]): Promise<void> {

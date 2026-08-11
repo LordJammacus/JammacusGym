@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { calculateMuscleGroupVolume, calculateTotalVolume } from '@/engines/analytics/volume';
-import type { CompletedSet, ExerciseMuscle, WorkoutExerciseInstance } from '@/types/entities';
+import {
+  calculateMuscleGroupVolume,
+  calculateTotalVolume,
+  calculateWeeklyVolume,
+} from '@/engines/analytics/volume';
+import { buildExerciseProgression } from '@/engines/analytics/intensity';
+import type {
+  CompletedSet,
+  ExerciseMuscle,
+  WorkoutExerciseInstance,
+  WorkoutInstance,
+} from '@/types/entities';
+import type { DateRange } from '@/types/analytics';
 
 describe('calculateMuscleGroupVolume', () => {
   it('calculates direct and indirect sets with contribution weights', () => {
@@ -73,6 +84,69 @@ describe('calculateTotalVolume', () => {
     expect(result).toBe(80 * 10 + 80 * 8);
   });
 });
+
+describe('abandoned workouts stay out of analytics', () => {
+  const range: DateRange = {
+    start: '2026-01-01T00:00:00.000Z',
+    end: '2026-01-31T23:59:59.999Z',
+  };
+
+  it('calculateWeeklyVolume ignores sets from abandoned sessions', () => {
+    const instances: WorkoutInstance[] = [
+      makeInstance('done', '2026-01-06', 'completed'),
+      makeInstance('quit', '2026-01-07', 'abandoned'),
+    ];
+    const exerciseInstances: WorkoutExerciseInstance[] = [
+      { ...makeEI('ei-done', 'ex-1'), workoutInstanceId: 'done' },
+      { ...makeEI('ei-quit', 'ex-1'), workoutInstanceId: 'quit' },
+    ];
+    const sets: CompletedSet[] = [
+      makeSet('s-done', 'ei-done', 100, 10),
+      makeSet('s-quit', 'ei-quit', 200, 10),
+    ];
+
+    const result = calculateWeeklyVolume(sets, instances, exerciseInstances, range);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.totalVolume).toBe(1000);
+    expect(result[0]!.workingSets).toBe(1);
+  });
+
+  it('buildExerciseProgression ignores abandoned sessions', () => {
+    const instances: WorkoutInstance[] = [
+      makeInstance('done', '2026-01-06', 'completed'),
+      makeInstance('quit', '2026-01-07', 'abandoned'),
+    ];
+    const exerciseInstances: WorkoutExerciseInstance[] = [
+      { ...makeEI('ei-done', 'ex-1'), workoutInstanceId: 'done' },
+      { ...makeEI('ei-quit', 'ex-1'), workoutInstanceId: 'quit' },
+    ];
+    const sets: CompletedSet[] = [
+      makeSet('s-done', 'ei-done', 100, 10),
+      makeSet('s-quit', 'ei-quit', 250, 5),
+    ];
+
+    const points = buildExerciseProgression(sets, exerciseInstances, instances, 'ex-1');
+    expect(points).toHaveLength(1);
+    expect(points[0]!.weight).toBe(100);
+  });
+});
+
+function makeInstance(id: string, date: string, status: WorkoutInstance['status']): WorkoutInstance {
+  return {
+    id,
+    workoutTemplateId: 'wt-1',
+    programId: null,
+    trainingBlockId: null,
+    templateName: 'Test',
+    goal: 'hypertrophy',
+    status,
+    startedAt: `${date}T10:00:00.000Z`,
+    completedAt: `${date}T11:00:00.000Z`,
+    durationSeconds: 3600,
+    notes: '',
+    createdAt: `${date}T10:00:00.000Z`,
+  };
+}
 
 function makeEI(id: string, exerciseId: string): WorkoutExerciseInstance {
   return {
