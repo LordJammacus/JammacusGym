@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   open: boolean;
@@ -32,7 +33,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
 
   if (!visible) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       role="dialog"
@@ -48,7 +49,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       />
       <div
         ref={panelRef}
-        className={`relative bg-surface-raised rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[85dvh] overflow-y-auto p-6 pb-safe-bottom
+        className={`relative bg-surface-raised rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[min(85dvh,100%)] overflow-y-auto p-6 pb-safe-bottom
           transition-transform duration-200 ease-out
           ${animating ? 'translate-y-0 sm:scale-100' : 'translate-y-full sm:translate-y-0 sm:scale-95'}
           ${animating ? 'opacity-100' : 'sm:opacity-0'}
@@ -59,6 +60,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -105,7 +105,13 @@ export function ProgramsPage() {
       </div>
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Program">
-        <div className="space-y-4">
+        <form
+          className="space-y-4"
+          onSubmit={e => {
+            e.preventDefault();
+            handleCreate();
+          }}
+        >
           <Input
             label="Name"
             placeholder="e.g. Push Pull Legs"
@@ -120,14 +126,14 @@ export function ProgramsPage() {
             onChange={e => setNewDescription(e.target.value)}
           />
           <div className="flex gap-3 pt-2">
-            <Button className="flex-1" onClick={handleCreate} disabled={!newName.trim()}>
+            <Button type="submit" className="flex-1" disabled={!newName.trim()}>
               Create
             </Button>
-            <Button className="flex-1" variant="secondary" onClick={() => setShowCreate(false)}>
+            <Button type="button" className="flex-1" variant="secondary" onClick={() => setShowCreate(false)}>
               Cancel
             </Button>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );
