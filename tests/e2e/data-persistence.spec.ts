@@ -10,8 +10,10 @@ test.describe('Data Persistence', () => {
       await page.getByRole('button', { name: 'Continue' }).click();
     }
 
-    // Navigate to settings
-    await page.getByRole('link', { name: 'More' }).click();
+    // Navigate to settings via More hub
+    await page.getByRole('button', { name: 'More' }).click();
+    await expect(page).toHaveURL('/more');
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page).toHaveURL('/settings');
 
     // Change units to lb

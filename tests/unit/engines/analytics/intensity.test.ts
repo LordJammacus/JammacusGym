@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { estimateOneRepMax, buildExerciseProgression } from '@/engines/analytics/intensity';
+import { estimateOneRepMax, buildExerciseProgression, buildAllExerciseProgressions } from '@/engines/analytics/intensity';
 import type { CompletedSet, WorkoutExerciseInstance, WorkoutInstance } from '@/types/entities';
 
 describe('estimateOneRepMax', () => {
@@ -74,6 +74,25 @@ describe('buildExerciseProgression', () => {
   it('returns empty for no matching exercise', () => {
     const result = buildExerciseProgression([], [], [], 'nonexistent');
     expect(result).toHaveLength(0);
+  });
+});
+
+describe('buildAllExerciseProgressions', () => {
+  it('builds timelines for every trained exercise', () => {
+    const instances: WorkoutInstance[] = [makeInstance('inst-1', '2026-01-01')];
+    const exerciseInstances: WorkoutExerciseInstance[] = [
+      makeEI('ei-1', 'inst-1', 'ex-1'),
+      makeEI('ei-2', 'inst-1', 'ex-2'),
+    ];
+    const sets: CompletedSet[] = [
+      makeSet('s1', 'ei-1', 80, 10),
+      makeSet('s2', 'ei-2', 40, 12),
+    ];
+
+    const result = buildAllExerciseProgressions(sets, exerciseInstances, instances);
+    expect(result.size).toBe(2);
+    expect(result.get('ex-1')?.[0]?.weight).toBe(80);
+    expect(result.get('ex-2')?.[0]?.weight).toBe(40);
   });
 });
 

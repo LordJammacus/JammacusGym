@@ -85,3 +85,22 @@ export function buildExerciseProgression(
 
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/**
+ * Build progression timelines for every exercise that appears in the given sessions.
+ */
+export function buildAllExerciseProgressions(
+  sets: CompletedSet[],
+  exerciseInstances: WorkoutExerciseInstance[],
+  instances: WorkoutInstance[],
+): Map<string, ExerciseProgressionPoint[]> {
+  const exerciseIds = new Set(exerciseInstances.map(ei => ei.exerciseId));
+  const map = new Map<string, ExerciseProgressionPoint[]>();
+  for (const exerciseId of exerciseIds) {
+    const points = buildExerciseProgression(sets, exerciseInstances, instances, exerciseId);
+    if (points.length > 0) {
+      map.set(exerciseId, points);
+    }
+  }
+  return map;
+}

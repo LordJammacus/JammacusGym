@@ -1,9 +1,16 @@
-export { estimateOneRepMax, buildExerciseProgression, calculateVolumeLoad } from './intensity';
+export { estimateOneRepMax, buildExerciseProgression, buildAllExerciseProgressions, calculateVolumeLoad } from './intensity';
 export { calculateMuscleGroupVolume, calculatePrimaryMuscleSets, filterSetsToDateRange, calculateWeeklyVolume, calculateRollingVolume, calculateTotalVolume } from './volume';
 export { calculateWeeklyFrequency, calculateWorkoutDurations, calculateAverageFrequency } from './frequency';
 export { calculateRestAdherence } from './rest';
 export { detectPersonalRecords } from './records';
-export { calculatePerformanceTrend, detectStagnation } from './performance';
+export {
+  calculatePerformanceTrend,
+  detectStagnation,
+  compareSessions,
+  summarizeExerciseProgress,
+  summarizeAllExercises,
+  getLatestWorkoutDeltas,
+} from './performance';
 export { completedWorkoutsOnly, completedWorkoutIdSet } from './completedOnly';
 export {
   buildFatigueTimeline,

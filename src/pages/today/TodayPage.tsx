@@ -46,7 +46,15 @@ export function TodayPage() {
 
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-2xl font-bold">Today</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Today</h1>
+        <button
+          onClick={() => navigate('/more')}
+          className="text-brand-light text-sm font-medium min-h-[44px] px-2"
+        >
+          More
+        </button>
+      </div>
 
       {activeProgram && nextWorkout ? (
         <Card className="space-y-3">

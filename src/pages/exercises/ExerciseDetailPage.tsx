@@ -93,6 +93,14 @@ export function ExerciseDetailPage() {
             </Card>
           )}
 
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => navigate(`/analytics/exercise/${exercise.id}`)}
+          >
+            View progress
+          </Button>
+
           {exercise.isCustom && (
             <Button variant="danger" className="w-full" onClick={handleArchive}>
               Archive Exercise

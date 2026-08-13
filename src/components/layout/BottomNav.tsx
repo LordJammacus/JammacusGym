@@ -30,9 +30,9 @@ const navItems: NavItem[] = [
     icon: <HistoryIcon />,
   },
   {
-    path: '/more',
-    label: 'More',
-    icon: <MoreIcon />,
+    path: '/analytics',
+    label: 'Stats',
+    icon: <StatsIcon />,
   },
 ];
 
@@ -49,10 +49,6 @@ export function BottomNav() {
 }
 
 function NavItem({ item }: { item: NavItem }) {
-  if (item.path === '/more') {
-    return <MoreMenu />;
-  }
-
   return (
     <NavLink
       to={item.path}
@@ -66,22 +62,6 @@ function NavItem({ item }: { item: NavItem }) {
     >
       <span className="w-6 h-6" aria-hidden="true">{item.icon}</span>
       <span className="text-[10px] font-medium">{item.label}</span>
-    </NavLink>
-  );
-}
-
-function MoreMenu() {
-  return (
-    <NavLink
-      to="/settings"
-      className={({ isActive }) =>
-        `flex flex-col items-center justify-center w-16 h-full gap-0.5 transition-colors ${
-          isActive ? 'text-brand-light' : 'text-zinc-400'
-        }`
-      }
-    >
-      <span className="w-6 h-6"><MoreIcon /></span>
-      <span className="text-[10px] font-medium">More</span>
     </NavLink>
   );
 }
@@ -123,12 +103,11 @@ function HistoryIcon() {
   );
 }
 
-function MoreIcon() {
+function StatsIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="12" cy="5" r="1" />
-      <circle cx="12" cy="19" r="1" />
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+      <polyline points="16 7 22 7 22 13" />
     </svg>
   );
 }

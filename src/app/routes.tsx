@@ -12,11 +12,13 @@ const ExerciseDetailPage = lazy(() => import('@/pages/exercises/ExerciseDetailPa
 const HistoryPage = lazy(() => import('@/pages/history/HistoryPage').then(m => ({ default: m.HistoryPage })));
 const HistoryDetailPage = lazy(() => import('@/pages/history/HistoryDetailPage').then(m => ({ default: m.HistoryDetailPage })));
 const AnalyticsPage = lazy(() => import('@/pages/analytics/AnalyticsPage').then(m => ({ default: m.AnalyticsPage })));
+const ExerciseAnalyticsPage = lazy(() => import('@/pages/analytics/ExerciseAnalyticsPage').then(m => ({ default: m.ExerciseAnalyticsPage })));
 const PRHistoryPage = lazy(() => import('@/pages/analytics/PRHistoryPage').then(m => ({ default: m.PRHistoryPage })));
 const TrainingManagerPage = lazy(() => import('@/pages/training-manager/TrainingManagerPage').then(m => ({ default: m.TrainingManagerPage })));
 const BodyPage = lazy(() => import('@/pages/body/BodyPage').then(m => ({ default: m.BodyPage })));
 const NotesPage = lazy(() => import('@/pages/notes/NotesPage').then(m => ({ default: m.NotesPage })));
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const MorePage = lazy(() => import('@/pages/more/MorePage').then(m => ({ default: m.MorePage })));
 
 function LazyFallback() {
   return <div className="flex items-center justify-center h-32 text-zinc-500 text-sm">Loading...</div>;
@@ -38,11 +40,13 @@ export function AppRoutes() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/history/:id" element={<HistoryDetailPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/analytics/exercise/:id" element={<ExerciseAnalyticsPage />} />
         <Route path="/analytics/records" element={<PRHistoryPage />} />
         <Route path="/training" element={<TrainingManagerPage />} />
         <Route path="/body" element={<BodyPage />} />
         <Route path="/notes" element={<NotesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/more" element={<MorePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

@@ -26,8 +26,19 @@ test.describe('App Shell', () => {
     await page.getByRole('link', { name: 'History' }).click();
     await expect(page).toHaveURL('/history');
 
+    await page.getByRole('link', { name: 'Stats' }).click();
+    await expect(page).toHaveURL('/analytics');
+    await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible();
+
     await page.getByRole('link', { name: 'Today' }).click();
     await expect(page).toHaveURL('/');
+  });
+
+  test('More hub is reachable from Today', async ({ page }) => {
+    await page.getByRole('button', { name: 'More' }).click();
+    await expect(page).toHaveURL('/more');
+    await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
+    await expect(page.getByText('Settings')).toBeVisible();
   });
 
   test('has proper dark theme', async ({ page }) => {

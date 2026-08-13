@@ -5,63 +5,43 @@ import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import type { TimePeriod, DateRange } from '@/types/analytics';
+import type { TimePeriod, ExerciseProgressSummary, LatestWorkoutComparison } from '@/types/analytics';
+import type { WeightUnit } from '@/types/enums';
 import * as analyticsRepo from '@/db/repositories/analytics';
 import {
-  buildExerciseProgression,
+  buildAllExerciseProgressions,
   calculateWeeklyVolume,
   calculateMuscleGroupVolume,
   calculateWeeklyFrequency,
   calculateWorkoutDurations,
   calculateRestAdherence,
   calculateAverageFrequency,
+  summarizeAllExercises,
+  getLatestWorkoutDeltas,
 } from '@/engines/analytics';
 import { getSettings } from '@/db/database';
+import { formatVolume, formatWeight } from '@/utils/units';
+import {
+  TIME_PERIODS,
+  chartColors,
+  chartTooltipStyle,
+  getDateRange,
+  formatChartDate,
+  formatDisplayDate,
+} from './helpers';
+import { DeltaText, ExerciseProgressRow, formatMetricDelta } from './ProgressWidgets';
 
-const TIME_PERIODS: { value: TimePeriod; label: string }[] = [
-  { value: '1w', label: '1W' },
-  { value: '1m', label: '1M' },
-  { value: '3m', label: '3M' },
-  { value: '6m', label: '6M' },
-  { value: '1y', label: '1Y' },
-  { value: 'all', label: 'All' },
-];
-
-function getDateRange(period: TimePeriod): DateRange {
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  const start = new Date();
-
-  switch (period) {
-    case '1w': start.setDate(start.getDate() - 7); break;
-    case '1m': start.setMonth(start.getMonth() - 1); break;
-    case '3m': start.setMonth(start.getMonth() - 3); break;
-    case '6m': start.setMonth(start.getMonth() - 6); break;
-    case '1y': start.setFullYear(start.getFullYear() - 1); break;
-    case 'all': start.setFullYear(2000); break;
-  }
-  start.setHours(0, 0, 0, 0);
-
-  return { start: start.toISOString(), end: end.toISOString() };
-}
-
-const chartColors = {
-  brand: '#6366f1',
-  green: '#22c55e',
-  amber: '#f59e0b',
-  cyan: '#06b6d4',
-  red: '#ef4444',
-  zinc: '#71717a',
-};
+type AnalyticsTab = 'progress' | 'volume';
 
 export function AnalyticsPage() {
   const navigate = useNavigate();
   const [period, setPeriod] = useState<TimePeriod>('3m');
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
-  const [exercises, setExercises] = useState<{ id: string; name: string }[]>([]);
+  const [tab, setTab] = useState<AnalyticsTab>('progress');
   const [loading, setLoading] = useState(true);
+  const [units, setUnits] = useState<WeightUnit>('kg');
 
-  const [progressionData, setProgressionData] = useState<{ date: string; weight: number; estimated1RM: number }[]>([]);
+  const [summaries, setSummaries] = useState<ExerciseProgressSummary[]>([]);
+  const [latestWorkout, setLatestWorkout] = useState<LatestWorkoutComparison | null>(null);
   const [weeklyVolumeData, setWeeklyVolumeData] = useState<{ weekStart: string; workingSets: number; totalVolume: number }[]>([]);
   const [muscleVolumeData, setMuscleVolumeData] = useState<{ muscleName: string; totalWeightedSets: number; directSets: number }[]>([]);
   const [frequencyData, setFrequencyData] = useState<{ weekStart: string; sessions: number }[]>([]);
@@ -73,10 +53,12 @@ export function AnalyticsPage() {
     setLoading(true);
     const dateRange = getDateRange(period);
     const settings = await getSettings();
+    setUnits(settings.units);
 
     const instances = await analyticsRepo.getCompletedInstances(dateRange);
     if (instances.length === 0) {
-      setProgressionData([]);
+      setSummaries([]);
+      setLatestWorkout(null);
       setWeeklyVolumeData([]);
       setMuscleVolumeData([]);
       setFrequencyData([]);
@@ -91,76 +73,49 @@ export function AnalyticsPage() {
     const exerciseInstances = await analyticsRepo.getAllExerciseInstances(instanceIds);
     const eiIds = exerciseInstances.map(ei => ei.id);
     const sets = await analyticsRepo.getAllCompletedSets(eiIds);
+    const exerciseNames = await analyticsRepo.getExerciseNames();
 
-    // Frequency
+    const progressions = buildAllExerciseProgressions(sets, exerciseInstances, instances);
+    setSummaries(summarizeAllExercises(progressions, exerciseNames));
+    setLatestWorkout(getLatestWorkoutDeltas(instances, exerciseInstances, progressions, exerciseNames));
+
     const freq = calculateWeeklyFrequency(instances, dateRange, settings.weekStartDay);
     setFrequencyData(freq);
     setAvgFrequency(calculateAverageFrequency(instances, dateRange));
-
-    // Duration
     setDurationData(calculateWorkoutDurations(instances, dateRange));
-
-    // Weekly volume
     setWeeklyVolumeData(calculateWeeklyVolume(sets, instances, exerciseInstances, dateRange, settings.weekStartDay));
 
-    // Muscle volume
     const exerciseMuscles = await analyticsRepo.getAllExerciseMuscles();
     const muscleNames = await analyticsRepo.getMuscleNames();
     setMuscleVolumeData(calculateMuscleGroupVolume(sets, exerciseInstances, exerciseMuscles, muscleNames));
-
-    // Rest adherence
     setRestAdherence(calculateRestAdherence(sets, exerciseInstances));
 
-    // Exercise progression
-    if (selectedExercise) {
-      const progression = buildExerciseProgression(sets, exerciseInstances, instances, selectedExercise);
-      setProgressionData(progression.map(p => ({
-        date: p.date,
-        weight: p.weight,
-        estimated1RM: p.estimated1RM,
-      })));
-    } else {
-      setProgressionData([]);
-    }
-
     setLoading(false);
-  }, [period, selectedExercise]);
-
-  useEffect(() => {
-    const loadExercises = async () => {
-      setExercises(await analyticsRepo.getActiveExerciseList());
-    };
-    loadExercises();
-  }, []);
+  }, [period]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const formatDate = (d: string) => {
-    if (!d) return '';
-    const parts = d.split('-');
-    if (parts.length < 3) return d;
-    return `${parts[1]}/${parts[2]}`;
-  };
+  const improvingCount = summaries.filter(s => s.trend.direction === 'improving').length;
+  const avgWeeklyVolume = weeklyVolumeData.length > 0
+    ? weeklyVolumeData.reduce((acc, w) => acc + w.totalVolume, 0) / weeklyVolumeData.length
+    : 0;
 
   return (
     <div className="p-4 space-y-5 pb-24">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Analytics</h1>
+        <h1 className="text-2xl font-bold">Progress</h1>
         <Button size="sm" variant="secondary" onClick={() => navigate('/analytics/records')}>
           PRs
         </Button>
       </div>
 
-      {/* Time period selector */}
       <div className="flex gap-1 bg-surface-overlay rounded-lg p-1">
         {TIME_PERIODS.map(tp => (
           <button
             key={tp.value}
             onClick={() => setPeriod(tp.value)}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-              period === tp.value
-                ? 'bg-brand text-white'
-                : 'text-zinc-400'
+            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors min-h-[44px] ${
+              period === tp.value ? 'bg-brand text-white' : 'text-zinc-400'
             }`}
           >
             {tp.label}
@@ -168,11 +123,109 @@ export function AnalyticsPage() {
         ))}
       </div>
 
+      <div className="flex gap-1 bg-surface-overlay rounded-lg p-1">
+        {([
+          { value: 'progress', label: 'Exercises' },
+          { value: 'volume', label: 'Volume' },
+        ] as const).map(t => (
+          <button
+            key={t.value}
+            onClick={() => setTab(t.value)}
+            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors min-h-[44px] ${
+              tab === t.value ? 'bg-brand text-white' : 'text-zinc-400'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
-        <Card><p className="text-zinc-400 text-sm">Loading analytics...</p></Card>
+        <Card><p className="text-zinc-400 text-sm">Loading progress...</p></Card>
+      ) : summaries.length === 0 && frequencyData.length === 0 ? (
+        <Card>
+          <p className="text-zinc-400 text-sm">Complete some workouts to see progression, trends, and graphs here.</p>
+        </Card>
+      ) : tab === 'progress' ? (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <Card>
+              <p className="text-2xl font-bold text-brand-light">{summaries.length}</p>
+              <p className="text-xs text-zinc-400">Exercises</p>
+            </Card>
+            <Card>
+              <p className="text-2xl font-bold text-green-400">{improvingCount}</p>
+              <p className="text-xs text-zinc-400">Improving</p>
+            </Card>
+            <Card>
+              <p className="text-2xl font-bold text-amber-400">{avgFrequency}</p>
+              <p className="text-xs text-zinc-400">Sessions/week</p>
+            </Card>
+          </div>
+
+          {latestWorkout && (
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold">Last workout</h2>
+              <p className="text-xs text-zinc-500">
+                {latestWorkout.workoutName} · {formatDisplayDate(latestWorkout.date)} vs previous session
+              </p>
+              <Card className="space-y-3">
+                {latestWorkout.exercises.map(ex => (
+                  <button
+                    key={ex.exerciseId}
+                    onClick={() => navigate(`/analytics/exercise/${ex.exerciseId}`)}
+                    className="w-full text-left flex items-center justify-between gap-3 min-h-[44px]"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{ex.exerciseName}</p>
+                      <p className="text-xs text-zinc-400">
+                        {formatWeight(ex.current.weight, units)} × {ex.current.reps}
+                      </p>
+                    </div>
+                    {ex.vsPrevious ? (
+                      <span className="text-xs shrink-0">
+                        <DeltaText value={ex.vsPrevious.weight} suffix={units} />
+                        <span className="text-zinc-600"> · </span>
+                        <DeltaText value={ex.vsPrevious.reps} suffix="r" />
+                      </span>
+                    ) : (
+                      <span className="text-xs text-zinc-500 shrink-0">First session</span>
+                    )}
+                  </button>
+                ))}
+              </Card>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Exercise trends</h2>
+            <p className="text-xs text-zinc-500">Tap an exercise for graphs over time</p>
+            {summaries.length === 0 ? (
+              <Card>
+                <p className="text-zinc-400 text-sm">No exercise data in this period.</p>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {summaries.map(summary => (
+                  <Card key={summary.exerciseId}>
+                    <ExerciseProgressRow
+                      summary={summary}
+                      units={units}
+                      onClick={() => navigate(`/analytics/exercise/${summary.exerciseId}`)}
+                    />
+                    {summary.sessionCount > 1 && (
+                      <p className="text-[11px] text-zinc-500 mt-2">
+                        {summary.sessionCount} sessions · {formatMetricDelta(summary.vsPeriodStart, units)} this period
+                      </p>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <>
-          {/* Overview stats */}
           <div className="grid grid-cols-3 gap-3">
             <Card>
               <p className="text-2xl font-bold text-brand-light">{avgFrequency}</p>
@@ -180,9 +233,7 @@ export function AnalyticsPage() {
             </Card>
             <Card>
               <p className="text-2xl font-bold text-green-400">
-                {weeklyVolumeData.length > 0
-                  ? Math.round(weeklyVolumeData.reduce((acc, w) => acc + w.totalVolume, 0) / weeklyVolumeData.length / 1000 * 10) / 10
-                  : 0}t
+                {avgWeeklyVolume > 0 ? formatVolume(avgWeeklyVolume, units) : '0'}
               </p>
               <p className="text-xs text-zinc-400">Avg vol/week</p>
             </Card>
@@ -194,45 +245,36 @@ export function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Workout frequency chart */}
           {frequencyData.length > 0 && (
             <Card>
               <h3 className="text-sm text-zinc-400 mb-3">Sessions per Week</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={frequencyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                  <XAxis dataKey="weekStart" tickFormatter={formatDate} tick={{ fontSize: 11, fill: '#71717a' }} />
+                  <XAxis dataKey="weekStart" tickFormatter={formatChartDate} tick={{ fontSize: 11, fill: '#71717a' }} />
                   <YAxis tick={{ fontSize: 11, fill: '#71717a' }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }}
-                    labelStyle={{ color: '#a1a1aa' }}
-                  />
+                  <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#a1a1aa' }} />
                   <Bar dataKey="sessions" fill={chartColors.brand} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Card>
           )}
 
-          {/* Weekly volume chart */}
           {weeklyVolumeData.length > 0 && (
             <Card>
               <h3 className="text-sm text-zinc-400 mb-3">Weekly Working Sets</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={weeklyVolumeData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                  <XAxis dataKey="weekStart" tickFormatter={formatDate} tick={{ fontSize: 11, fill: '#71717a' }} />
+                  <XAxis dataKey="weekStart" tickFormatter={formatChartDate} tick={{ fontSize: 11, fill: '#71717a' }} />
                   <YAxis tick={{ fontSize: 11, fill: '#71717a' }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }}
-                    labelStyle={{ color: '#a1a1aa' }}
-                  />
+                  <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#a1a1aa' }} />
                   <Bar dataKey="workingSets" fill={chartColors.green} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Card>
           )}
 
-          {/* Muscle group volume chart */}
           {muscleVolumeData.length > 0 && (
             <Card>
               <h3 className="text-sm text-zinc-400 mb-3">Volume by Muscle Group</h3>
@@ -241,37 +283,29 @@ export function AnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                   <XAxis type="number" tick={{ fontSize: 11, fill: '#71717a' }} />
                   <YAxis dataKey="muscleName" type="category" width={80} tick={{ fontSize: 10, fill: '#a1a1aa' }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }}
-                    labelStyle={{ color: '#a1a1aa' }}
-                  />
-                  <Bar dataKey="directSets" fill={chartColors.brand} stackId="a" name="Direct" radius={[0, 0, 0, 0]} />
+                  <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#a1a1aa' }} />
+                  <Bar dataKey="directSets" fill={chartColors.brand} stackId="a" name="Direct" />
                   <Bar dataKey="totalWeightedSets" fill={chartColors.cyan} name="Total (weighted)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Card>
           )}
 
-          {/* Workout duration chart */}
           {durationData.length > 0 && (
             <Card>
               <h3 className="text-sm text-zinc-400 mb-3">Workout Duration (min)</h3>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={durationData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                  <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 11, fill: '#71717a' }} />
+                  <XAxis dataKey="date" tickFormatter={formatChartDate} tick={{ fontSize: 11, fill: '#71717a' }} />
                   <YAxis tick={{ fontSize: 11, fill: '#71717a' }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }}
-                    labelStyle={{ color: '#a1a1aa' }}
-                  />
+                  <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#a1a1aa' }} />
                   <Line type="monotone" dataKey="durationMinutes" stroke={chartColors.amber} strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </Card>
           )}
 
-          {/* Rest adherence */}
           {restAdherence && restAdherence.totalSetsWithRest > 0 && (
             <Card>
               <h3 className="text-sm text-zinc-400 mb-2">Rest Adherence</h3>
@@ -294,70 +328,6 @@ export function AnalyticsPage() {
                   <p className="text-xs text-zinc-500">Adherence</p>
                 </div>
               </div>
-            </Card>
-          )}
-
-          {/* Exercise-specific section */}
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold">Exercise Analysis</h2>
-            <select
-              className="w-full rounded-lg bg-surface-overlay border border-white/10 px-3 py-2.5 text-white text-sm"
-              value={selectedExercise ?? ''}
-              onChange={e => setSelectedExercise(e.target.value || null)}
-            >
-              <option value="">Select exercise...</option>
-              {exercises.map(ex => (
-                <option key={ex.id} value={ex.id}>{ex.name}</option>
-              ))}
-            </select>
-
-            {selectedExercise && progressionData.length > 0 && (
-              <>
-                <Card>
-                  <h3 className="text-sm text-zinc-400 mb-3">Weight Progression</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={progressionData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                      <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 11, fill: '#71717a' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#71717a' }} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }}
-                        labelStyle={{ color: '#a1a1aa' }}
-                      />
-                      <Line type="monotone" dataKey="weight" stroke={chartColors.brand} strokeWidth={2} dot={{ r: 3, fill: chartColors.brand }} name="Weight (kg)" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Card>
-
-                <Card>
-                  <h3 className="text-sm text-zinc-400 mb-3">Estimated 1RM</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={progressionData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                      <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 11, fill: '#71717a' }} />
-                      <YAxis tick={{ fontSize: 11, fill: '#71717a' }} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }}
-                        labelStyle={{ color: '#a1a1aa' }}
-                      />
-                      <Line type="monotone" dataKey="estimated1RM" stroke={chartColors.green} strokeWidth={2} dot={{ r: 3, fill: chartColors.green }} name="Est. 1RM (kg)" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Card>
-              </>
-            )}
-
-            {selectedExercise && progressionData.length === 0 && (
-              <Card>
-                <p className="text-zinc-400 text-sm">No workout data found for this exercise in the selected period.</p>
-              </Card>
-            )}
-          </div>
-
-          {/* Empty state */}
-          {frequencyData.length === 0 && weeklyVolumeData.length === 0 && (
-            <Card>
-              <p className="text-zinc-400 text-sm">Complete some workouts to see analytics here.</p>
             </Card>
           )}
         </>

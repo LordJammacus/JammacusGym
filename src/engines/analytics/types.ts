@@ -11,4 +11,9 @@ export type {
   PerformanceTrendResult,
   RollingVolumeResult,
   StagnationResult,
+  MetricDelta,
+  SessionComparisonPoint,
+  ExerciseProgressSummary,
+  WorkoutExerciseDelta,
+  LatestWorkoutComparison,
 } from '@/types/analytics';

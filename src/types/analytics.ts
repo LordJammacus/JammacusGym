@@ -83,3 +83,46 @@ export interface StagnationResult {
   isStagnating: boolean;
   lastProgressDate: string | null;
 }
+
+export interface MetricDelta {
+  weight: number;
+  reps: number;
+  estimated1RM: number;
+  volumeLoad: number;
+}
+
+export interface SessionComparisonPoint {
+  date: string;
+  weight: number;
+  reps: number;
+  estimated1RM: number;
+  volumeLoad: number;
+  vsPrevious: MetricDelta | null;
+}
+
+export interface ExerciseProgressSummary {
+  exerciseId: string;
+  exerciseName: string;
+  sessionCount: number;
+  latest: ExerciseProgressionPoint;
+  previous: ExerciseProgressionPoint | null;
+  first: ExerciseProgressionPoint;
+  vsPrevious: MetricDelta | null;
+  vsPeriodStart: MetricDelta;
+  trend: PerformanceTrendResult;
+  stagnation: StagnationResult;
+}
+
+export interface WorkoutExerciseDelta {
+  exerciseId: string;
+  exerciseName: string;
+  current: ExerciseProgressionPoint;
+  previous: ExerciseProgressionPoint | null;
+  vsPrevious: MetricDelta | null;
+}
+
+export interface LatestWorkoutComparison {
+  workoutName: string;
+  date: string;
+  exercises: WorkoutExerciseDelta[];
+}

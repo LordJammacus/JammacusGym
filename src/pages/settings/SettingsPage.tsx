@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Button, Modal } from '@/components/ui';
 import type { UserSettings } from '@/types/entities';
 import type { DayOfWeek } from '@/types/enums';
@@ -28,6 +29,7 @@ const PROGRESSION_STRATEGIES = [
 ] as const;
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -129,6 +131,9 @@ export function SettingsPage() {
 
   return (
     <div className="p-4 space-y-4 pb-24">
+      <button onClick={() => navigate('/more')} className="text-brand-light text-sm">
+        ← More
+      </button>
       <h1 className="text-2xl font-bold">Settings</h1>
 
       {/* Units */}
