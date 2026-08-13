@@ -74,8 +74,26 @@ export async function getLastInstanceForTemplate(templateId: string, excludeId?:
   return instances[instances.length - 1];
 }
 
+export async function updateCompletedSet(id: string, updates: Partial<CompletedSet>): Promise<void> {
+  await db.completedSets.update(id, updates);
+}
+
 export async function deleteCompletedSet(id: string): Promise<void> {
   await db.completedSets.delete(id);
+}
+
+export async function reindexCompletedSets(
+  workoutExerciseInstanceId: string,
+): Promise<void> {
+  const sets = await getCompletedSets(workoutExerciseInstanceId);
+  await db.transaction('rw', db.completedSets, async () => {
+    for (let i = 0; i < sets.length; i++) {
+      const set = sets[i]!;
+      if (set.orderIndex !== i) {
+        await db.completedSets.update(set.id, { orderIndex: i });
+      }
+    }
+  });
 }
 
 /**

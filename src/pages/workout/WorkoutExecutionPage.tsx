@@ -690,7 +690,7 @@ export function ActiveWorkoutPage() {
       </div>
 
       {/* Exercise prev/next */}
-      <div className="flex gap-3 p-4 bg-surface-raised border-t border-white/10">
+      <div className="flex gap-3 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-surface-raised border-t border-white/10">
         <Button
           variant="secondary"
           className="flex-1"

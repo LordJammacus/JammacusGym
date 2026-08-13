@@ -23,7 +23,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
   if (step === 'welcome') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[100dvh] p-6 text-center page-enter">
+      <div className="flex flex-col items-center justify-center min-h-[100dvh] p-6 pt-safe-top text-center page-enter">
         <div className="w-16 h-16 rounded-2xl bg-brand/20 flex items-center justify-center mb-6">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-brand-light">
             <path d="M6.5 6.5h11M6.5 17.5h11M3 10.5h2M3 13.5h2M19 10.5h2M19 13.5h2M5 6.5v11M19 6.5v11M12 4v16" />
@@ -42,7 +42,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
 
   if (step === 'units') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[100dvh] p-6 text-center page-enter">
+      <div className="flex flex-col items-center justify-center min-h-[100dvh] p-6 pt-safe-top text-center page-enter">
         <h2 className="text-xl font-bold text-white mb-2">Weight units</h2>
         <p className="text-zinc-400 text-sm mb-6">You can change this later in Settings.</p>
         <div className="flex gap-3 w-full max-w-xs mb-8">

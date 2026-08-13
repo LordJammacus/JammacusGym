@@ -16,12 +16,12 @@ export function PageLayout({ children }: PageLayoutProps) {
   }, [location.pathname]);
 
   return (
-    <div className="flex flex-col h-[100dvh] overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden pt-safe-top pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <main
         className={
           hideNav
             ? 'flex-1 min-h-0 overflow-hidden flex flex-col'
-            : 'flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[calc(4rem+env(safe-area-inset-bottom,0px))]'
+            : 'flex-1 min-h-0 overflow-y-auto overscroll-contain'
         }
       >
         <div
