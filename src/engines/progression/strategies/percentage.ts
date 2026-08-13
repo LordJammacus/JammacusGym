@@ -1,5 +1,5 @@
 import type { ProgressionStrategy, ProgressionInput, ProgressionResult } from '../types';
-import { cloneTargets, roundWeight } from '../utils';
+import { cloneTargets, roundWeight, firstWorkingTarget } from '../utils';
 
 /**
  * Percentage-based progression: weight increases by a fixed percentage each session
@@ -18,7 +18,8 @@ export const percentageProgression: ProgressionStrategy = {
     }
 
     const lastSession = history[0]!;
-    const repMin = currentTargets[0]?.targetRepMin ?? 5;
+    const workingTarget = firstWorkingTarget(currentTargets);
+    const repMin = workingTarget?.targetRepMin ?? 5;
     const requiredSuccess = rule.requiredConsecutiveSuccess || 1;
     const pct = rule.weightIncrement || 2.5;
 
@@ -31,7 +32,7 @@ export const percentageProgression: ProgressionStrategy = {
       else break;
     }
 
-    const lastWeight = lastSession[0]?.actualWeight ?? currentTargets[0]?.targetWeight ?? 0;
+    const lastWeight = lastSession[0]?.actualWeight ?? workingTarget?.targetWeight ?? 0;
 
     if (consecutiveSuccesses >= requiredSuccess && lastWeight > 0) {
       const rawIncrease = lastWeight * (pct / 100);

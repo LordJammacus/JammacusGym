@@ -1,4 +1,5 @@
 import type { ProgressionStrategy as IProgressionStrategy, ProgressionInput, ProgressionResult } from './types';
+import { sanitizeProgressionHistory } from './utils';
 import type { ProgressionStrategy as StrategyType } from '@/types/enums';
 import { doubleProgression } from './strategies/double';
 import { weightProgression } from './strategies/weight';
@@ -20,7 +21,10 @@ const strategies: Record<StrategyType, IProgressionStrategy> = {
 
 export function calculateProgression(input: ProgressionInput): ProgressionResult {
   const strategy = strategies[input.rule.strategy];
-  return strategy.calculateNextTargets(input);
+  return strategy.calculateNextTargets({
+    ...input,
+    history: sanitizeProgressionHistory(input.history, input.currentTargets),
+  });
 }
 
 export type { ProgressionInput, ProgressionResult, SessionSets } from './types';

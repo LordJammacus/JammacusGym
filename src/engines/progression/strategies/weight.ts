@@ -1,5 +1,5 @@
 import type { ProgressionStrategy, ProgressionInput, ProgressionResult } from '../types';
-import { cloneTargets, roundWeight, countConsecutiveSuccesses, countConsecutiveFailures } from '../utils';
+import { cloneTargets, roundWeight, countConsecutiveSuccesses, countConsecutiveFailures, firstWorkingTarget } from '../utils';
 
 /**
  * Linear weight progression: increase weight every N successful sessions.
@@ -16,7 +16,8 @@ export const weightProgression: ProgressionStrategy = {
       return { nextTargets, reasoning: 'No history yet — using template targets.', action: 'maintain', confidence: 'low' };
     }
 
-    const repMin = currentTargets[0]?.targetRepMin ?? 5;
+    const workingTarget = firstWorkingTarget(currentTargets);
+    const repMin = workingTarget?.targetRepMin ?? 5;
     const increment = rule.weightIncrement || settings.weightIncrement;
     const requiredSuccess = rule.requiredConsecutiveSuccess || 1;
 
@@ -46,7 +47,7 @@ export const weightProgression: ProgressionStrategy = {
     }
 
     if (consecutiveSuccesses >= requiredSuccess) {
-      const lastWeight = history[0]![0]?.actualWeight ?? currentTargets[0]?.targetWeight ?? 0;
+      const lastWeight = history[0]![0]?.actualWeight ?? workingTarget?.targetWeight ?? 0;
       const newWeight = roundWeight(lastWeight + increment, settings.weightIncrement);
 
       for (const t of nextTargets) {
@@ -61,7 +62,7 @@ export const weightProgression: ProgressionStrategy = {
       };
     }
 
-    const lastWeight = history[0]![0]?.actualWeight ?? currentTargets[0]?.targetWeight ?? 0;
+    const lastWeight = history[0]![0]?.actualWeight ?? workingTarget?.targetWeight ?? 0;
     for (const t of nextTargets) {
       if (t.setType === 'working') t.targetWeight = lastWeight;
     }

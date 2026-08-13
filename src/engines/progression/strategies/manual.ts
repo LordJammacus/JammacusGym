@@ -1,5 +1,5 @@
 import type { ProgressionStrategy, ProgressionInput, ProgressionResult } from '../types';
-import { cloneTargets } from '../utils';
+import { cloneTargets, isWorkingSetType } from '../utils';
 
 /**
  * Manual progression: no auto-adjustment. Targets stay as configured in the template.
@@ -12,12 +12,12 @@ export const manualProgression: ProgressionStrategy = {
     const nextTargets = cloneTargets(currentTargets);
 
     if (history.length > 0) {
-      const lastSession = history[0]!;
-      for (let i = 0; i < nextTargets.length; i++) {
-        const lastSet = lastSession[i];
-        if (lastSet && nextTargets[i]!.setType === 'working') {
-          nextTargets[i]!.targetWeight = lastSet.actualWeight;
-        }
+      const lastWorking = history[0]!.filter(s => isWorkingSetType(s.setType));
+      let wi = 0;
+      for (const t of nextTargets) {
+        if (!isWorkingSetType(t.setType)) continue;
+        const lastSet = lastWorking[wi++];
+        if (lastSet) t.targetWeight = lastSet.actualWeight;
       }
     }
 

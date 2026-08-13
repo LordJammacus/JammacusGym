@@ -1,5 +1,5 @@
 import type { ProgressionStrategy, ProgressionInput, ProgressionResult } from '../types';
-import { cloneTargets, roundWeight, countConsecutiveSuccesses, countConsecutiveFailures } from '../utils';
+import { cloneTargets, roundWeight, countConsecutiveSuccesses, countConsecutiveFailures, firstWorkingTarget } from '../utils';
 
 /**
  * Double progression: increase reps within a range, then bump weight and reset reps.
@@ -20,8 +20,9 @@ export const doubleProgression: ProgressionStrategy = {
       return { nextTargets, reasoning: 'No history yet — using template targets.', action: 'maintain', confidence: 'low' };
     }
 
-    const repCeiling = rule.repThreshold ?? currentTargets[0]?.targetRepMax ?? 12;
-    const repFloor = currentTargets[0]?.targetRepMin ?? 8;
+    const workingTarget = firstWorkingTarget(currentTargets);
+    const repCeiling = rule.repThreshold ?? workingTarget?.targetRepMax ?? 12;
+    const repFloor = workingTarget?.targetRepMin ?? 8;
     const increment = rule.weightIncrement || settings.weightIncrement;
     const requiredSuccess = rule.requiredConsecutiveSuccess || 1;
 
@@ -55,7 +56,7 @@ export const doubleProgression: ProgressionStrategy = {
 
     // Weight increase check
     if (consecutiveSuccesses >= requiredSuccess) {
-      const lastWeight = history[0]![0]?.actualWeight ?? currentTargets[0]?.targetWeight ?? 0;
+      const lastWeight = history[0]![0]?.actualWeight ?? workingTarget?.targetWeight ?? 0;
       const newWeight = roundWeight(lastWeight + increment, settings.weightIncrement);
 
       for (const t of nextTargets) {
@@ -76,7 +77,7 @@ export const doubleProgression: ProgressionStrategy = {
     }
 
     // Maintain — carry forward last session's weight
-    const lastWeight = history[0]![0]?.actualWeight ?? currentTargets[0]?.targetWeight ?? 0;
+    const lastWeight = history[0]![0]?.actualWeight ?? workingTarget?.targetWeight ?? 0;
     for (const t of nextTargets) {
       if (t.setType === 'working') {
         t.targetWeight = lastWeight;

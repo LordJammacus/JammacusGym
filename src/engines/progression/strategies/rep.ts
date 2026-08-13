@@ -1,5 +1,5 @@
 import type { ProgressionStrategy, ProgressionInput, ProgressionResult } from '../types';
-import { cloneTargets, countConsecutiveFailures } from '../utils';
+import { cloneTargets, countConsecutiveFailures, firstWorkingTarget } from '../utils';
 
 /**
  * Rep progression: weight stays fixed, target reps increase each successful session.
@@ -17,13 +17,14 @@ export const repProgression: ProgressionStrategy = {
     }
 
     const lastSession = history[0]!;
-    const repMin = currentTargets[0]?.targetRepMin ?? 8;
+    const workingTarget = firstWorkingTarget(currentTargets);
+    const repMin = workingTarget?.targetRepMin ?? 8;
     const repCeiling = rule.repThreshold ?? 20;
 
-    const allHitTarget = lastSession.every(s => s.actualReps >= (currentTargets[0]?.targetRepMax ?? repMin));
+    const allHitTarget = lastSession.every(s => s.actualReps >= (workingTarget?.targetRepMax ?? repMin));
 
     if (allHitTarget) {
-      const currentMax = currentTargets[0]?.targetRepMax ?? repMin;
+      const currentMax = workingTarget?.targetRepMax ?? repMin;
       const newRepMax = Math.min(currentMax + 1, repCeiling);
       const newRepMin = Math.min(repMin + 1, newRepMax);
 
@@ -73,7 +74,7 @@ export const repProgression: ProgressionStrategy = {
       };
     }
 
-    const lastWeight = lastSession[0]?.actualWeight ?? currentTargets[0]?.targetWeight ?? 0;
+    const lastWeight = lastSession[0]?.actualWeight ?? workingTarget?.targetWeight ?? 0;
     for (const t of nextTargets) {
       if (t.setType === 'working') t.targetWeight = lastWeight;
     }

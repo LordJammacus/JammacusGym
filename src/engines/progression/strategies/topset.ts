@@ -1,5 +1,5 @@
 import type { ProgressionStrategy, ProgressionInput, ProgressionResult } from '../types';
-import { cloneTargets, roundWeight, countConsecutiveSuccesses, countConsecutiveFailures } from '../utils';
+import { cloneTargets, roundWeight, countConsecutiveSuccesses, countConsecutiveFailures, isWorkingSetType } from '../utils';
 
 /**
  * Top set + back-off: first set is the "top set" that progresses independently.
@@ -18,7 +18,9 @@ export const topsetProgression: ProgressionStrategy = {
       return { nextTargets, reasoning: 'No history yet — using template targets.', action: 'maintain', confidence: 'low' };
     }
 
-    if (currentTargets.length === 0) {
+    const topIdx = currentTargets.findIndex(t => isWorkingSetType(t.setType));
+    const topTarget = topIdx >= 0 ? currentTargets[topIdx] : currentTargets[0];
+    if (!topTarget) {
       return { nextTargets, reasoning: 'No targets configured.', action: 'maintain', confidence: 'low' };
     }
 
@@ -28,7 +30,7 @@ export const topsetProgression: ProgressionStrategy = {
       return { nextTargets, reasoning: 'No sets logged in last session.', action: 'maintain', confidence: 'low' };
     }
 
-    const repMin = currentTargets[0]!.targetRepMin;
+    const repMin = topTarget.targetRepMin;
     const increment = rule.weightIncrement || settings.weightIncrement;
     const requiredSuccess = rule.requiredConsecutiveSuccess || 1;
 
@@ -46,9 +48,10 @@ export const topsetProgression: ProgressionStrategy = {
       const deloadTop = roundWeight(topSetResult.actualWeight * (1 - rule.deloadPercentage / 100), settings.weightIncrement);
       const deloadBackoff = roundWeight(deloadTop * BACKOFF_PERCENTAGE, settings.weightIncrement);
 
-      nextTargets[0]!.targetWeight = deloadTop;
-      for (let i = 1; i < nextTargets.length; i++) {
-        if (nextTargets[i]!.setType === 'working' || nextTargets[i]!.setType === 'backoff') {
+      nextTargets[topIdx >= 0 ? topIdx : 0]!.targetWeight = deloadTop;
+      for (let i = 0; i < nextTargets.length; i++) {
+        if (i === (topIdx >= 0 ? topIdx : 0)) continue;
+        if (isWorkingSetType(nextTargets[i]!.setType)) {
           nextTargets[i]!.targetWeight = deloadBackoff;
         }
       }
@@ -66,9 +69,10 @@ export const topsetProgression: ProgressionStrategy = {
       const newTopWeight = roundWeight(topSetResult.actualWeight + increment, settings.weightIncrement);
       const backoffWeight = roundWeight(newTopWeight * BACKOFF_PERCENTAGE, settings.weightIncrement);
 
-      nextTargets[0]!.targetWeight = newTopWeight;
-      for (let i = 1; i < nextTargets.length; i++) {
-        if (nextTargets[i]!.setType === 'working' || nextTargets[i]!.setType === 'backoff') {
+      nextTargets[topIdx >= 0 ? topIdx : 0]!.targetWeight = newTopWeight;
+      for (let i = 0; i < nextTargets.length; i++) {
+        if (i === (topIdx >= 0 ? topIdx : 0)) continue;
+        if (isWorkingSetType(nextTargets[i]!.setType)) {
           nextTargets[i]!.targetWeight = backoffWeight;
         }
       }
@@ -85,9 +89,10 @@ export const topsetProgression: ProgressionStrategy = {
     const topWeight = topSetResult.actualWeight;
     const backoffWeight = roundWeight(topWeight * BACKOFF_PERCENTAGE, settings.weightIncrement);
 
-    nextTargets[0]!.targetWeight = topWeight;
-    for (let i = 1; i < nextTargets.length; i++) {
-      if (nextTargets[i]!.setType === 'working' || nextTargets[i]!.setType === 'backoff') {
+    nextTargets[topIdx >= 0 ? topIdx : 0]!.targetWeight = topWeight;
+    for (let i = 0; i < nextTargets.length; i++) {
+      if (i === (topIdx >= 0 ? topIdx : 0)) continue;
+      if (isWorkingSetType(nextTargets[i]!.setType)) {
         nextTargets[i]!.targetWeight = backoffWeight;
       }
     }

@@ -300,15 +300,17 @@ export function ActiveWorkoutPage() {
   const currentSetIdx = currentSets.length;
   const currentTarget = currentTargets[currentSetIdx];
 
-  // Set defaults from targets when switching exercises
+  // Set defaults from targets when switching exercises / advancing sets
   useEffect(() => {
     if (currentTarget) {
       setWeight(currentTarget.targetWeight ?? (currentSets[currentSets.length - 1]?.actualWeight ?? 0));
       setReps(currentTarget.targetRepMax ?? 10);
+      setSetType(currentTarget.setType);
     } else if (currentSets.length > 0) {
       const lastSet = currentSets[currentSets.length - 1]!;
       setWeight(lastSet.actualWeight);
       setReps(lastSet.actualReps);
+      setSetType('working');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentExerciseIndex, currentSetIdx]);
@@ -317,9 +319,9 @@ export function ActiveWorkoutPage() {
     haptic('success');
     setSetFlash(true);
     setTimeout(() => setSetFlash(false), 400);
-    await completeSet({ weight, reps, rir: null, setType });
-    setSetType('working');
-  }, [weight, reps, setType, completeSet]);
+    const typeToLog = currentTarget?.setType ?? setType;
+    await completeSet({ weight, reps, rir: null, setType: typeToLog });
+  }, [weight, reps, setType, currentTarget, completeSet]);
 
   const handleAbandon = useCallback(async () => {
     setShowAbandon(false);

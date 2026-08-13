@@ -1,5 +1,5 @@
 import type { ProgressionStrategy, ProgressionInput, ProgressionResult } from '../types';
-import { cloneTargets, roundWeight, countConsecutiveFailures } from '../utils';
+import { cloneTargets, roundWeight, countConsecutiveFailures, firstWorkingTarget } from '../utils';
 
 /**
  * RIR-based progression: user reports reps-in-reserve, weight adjusts to maintain target RIR.
@@ -18,10 +18,11 @@ export const rirProgression: ProgressionStrategy = {
     }
 
     const lastSession = history[0]!;
+    const workingTarget = firstWorkingTarget(currentTargets);
     const setsWithRir = lastSession.filter(s => s.actualRir !== null);
 
     if (setsWithRir.length === 0) {
-      const lastWeight = lastSession[0]?.actualWeight ?? currentTargets[0]?.targetWeight ?? 0;
+      const lastWeight = lastSession[0]?.actualWeight ?? workingTarget?.targetWeight ?? 0;
       for (const t of nextTargets) {
         if (t.setType === 'working') t.targetWeight = lastWeight;
       }
@@ -33,10 +34,10 @@ export const rirProgression: ProgressionStrategy = {
       };
     }
 
-    const targetRir = currentTargets[0]?.targetRir ?? settings.defaultRir ?? 2;
+    const targetRir = workingTarget?.targetRir ?? settings.defaultRir ?? 2;
     const avgRir = setsWithRir.reduce((sum, s) => sum + s.actualRir!, 0) / setsWithRir.length;
     const increment = rule.weightIncrement || settings.weightIncrement;
-    const lastWeight = lastSession[0]?.actualWeight ?? currentTargets[0]?.targetWeight ?? 0;
+    const lastWeight = lastSession[0]?.actualWeight ?? workingTarget?.targetWeight ?? 0;
 
     // Deload check
     const didFail = (session: ProgressionInput['history'][number]) => {
