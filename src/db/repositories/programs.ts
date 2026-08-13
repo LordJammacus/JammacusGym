@@ -82,6 +82,23 @@ export async function reorderBlocks(blocks: { id: string; orderIndex: number }[]
 
 // --- Block Workouts ---
 
+export async function getProgramContextForTemplate(templateId: string): Promise<{
+  programId: string | null;
+  trainingBlockId: string | null;
+}> {
+  const program = await getActiveProgram();
+  if (!program) return { programId: null, trainingBlockId: null };
+
+  const blocks = await getBlocksForProgram(program.id);
+  for (const block of blocks) {
+    const workouts = await getBlockWorkouts(block.id);
+    if (workouts.some(bw => bw.workoutTemplateId === templateId)) {
+      return { programId: program.id, trainingBlockId: block.id };
+    }
+  }
+  return { programId: null, trainingBlockId: null };
+}
+
 export async function getBlockWorkouts(trainingBlockId: string): Promise<BlockWorkout[]> {
   return db.blockWorkouts
     .where('trainingBlockId')
@@ -119,15 +136,20 @@ export async function determineNextWorkout(programId: string): Promise<{
   const blockWorkouts = await getBlockWorkouts(activeBlock.id);
   if (blockWorkouts.length === 0) return null;
 
-  const lastCompleted = await db.workoutInstances
+  const templateIds = new Set(blockWorkouts.map(bw => bw.workoutTemplateId));
+  const completed = await db.workoutInstances
     .where('status')
     .equals('completed')
-    .filter(i => i.programId === programId)
     .sortBy('startedAt');
 
-  const lastWorkout = lastCompleted[lastCompleted.length - 1];
+  // Starts historically omitted programId. Count completed sessions of this
+  // block's templates; abandoned/in-progress never happened for rotation.
+  const lastWorkout = [...completed].reverse().find(i => {
+    if (!i.workoutTemplateId || !templateIds.has(i.workoutTemplateId)) return false;
+    return i.programId === programId || i.programId === null;
+  });
 
-  if (!lastWorkout) {
+  if (!lastWorkout?.workoutTemplateId) {
     return {
       templateId: blockWorkouts[0]!.workoutTemplateId,
       blockName: activeBlock.name,
@@ -135,9 +157,8 @@ export async function determineNextWorkout(programId: string): Promise<{
     };
   }
 
-  const lastTemplateId = lastWorkout.workoutTemplateId;
-  const lastIdx = blockWorkouts.findIndex(bw => bw.workoutTemplateId === lastTemplateId);
-  const nextIdx = (lastIdx + 1) % blockWorkouts.length;
+  const lastIdx = blockWorkouts.findIndex(bw => bw.workoutTemplateId === lastWorkout.workoutTemplateId);
+  const nextIdx = lastIdx < 0 ? 0 : (lastIdx + 1) % blockWorkouts.length;
 
   return {
     templateId: blockWorkouts[nextIdx]!.workoutTemplateId,

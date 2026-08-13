@@ -12,6 +12,7 @@ import * as instancesRepo from '@/db/repositories/instances';
 import * as progressionRulesRepo from '@/db/repositories/progressionRules';
 import * as notesRepo from '@/db/repositories/notes';
 import { getSettings } from '@/db/database';
+import { getProgramContextForTemplate } from '@/db/repositories/programs';
 import { calculateProgression } from '@/engines/progression';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { generateId } from '@/utils/ids';
@@ -105,11 +106,12 @@ export function StartWorkoutPage() {
       }
 
       const instanceId = generateId();
+      const programContext = await getProgramContextForTemplate(template.id);
       const instance: WorkoutInstance = {
         id: instanceId,
         workoutTemplateId: template.id,
-        programId: null,
-        trainingBlockId: null,
+        programId: programContext.programId,
+        trainingBlockId: programContext.trainingBlockId,
         templateName: template.name,
         goal: template.goal,
         status: 'in_progress',
