@@ -13,6 +13,7 @@ describe('UserSettings', () => {
     expect(settings.units).toBe('kg');
     expect(settings.weekStartDay).toBe(1);
     expect(settings.defaultRestSeconds).toBe(120);
+    expect(settings.restTimerAdjustSeconds).toBe(15);
     expect(settings.defaultRir).toBe(2);
     expect(settings.defaultProgressionStrategy).toBe('double');
     expect(settings.theme).toBe('dark');
@@ -32,6 +33,13 @@ describe('UserSettings', () => {
     expect(updated.units).toBe('lb');
     expect(updated.weightIncrement).toBe(5);
     expect(updated.id).toBe('default');
+  });
+
+  it('fills missing restTimerAdjustSeconds from defaults', async () => {
+    const { restTimerAdjustSeconds: _omitted, ...legacy } = DEFAULT_SETTINGS;
+    await db.userSettings.put(legacy as typeof DEFAULT_SETTINGS);
+    const settings = await getSettings();
+    expect(settings.restTimerAdjustSeconds).toBe(15);
   });
 
   it('preserves unchanged fields during update', async () => {

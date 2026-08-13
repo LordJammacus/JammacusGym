@@ -207,6 +207,25 @@ export function SettingsPage() {
         </div>
       </Card>
 
+      {/* Rest Timer Adjustment */}
+      <Card className="space-y-3">
+        <h3 className="text-sm text-zinc-400 font-medium">Rest Timer Adjustment</h3>
+        <p className="text-xs text-zinc-500">Amount added or removed during a set rest. Does not change workout presets.</p>
+        <div className="flex gap-2">
+          {[5, 10, 15, 30].map(s => (
+            <button
+              key={s}
+              onClick={() => save({ restTimerAdjustSeconds: s })}
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg min-h-[44px] transition-colors ${
+                settings.restTimerAdjustSeconds === s ? 'bg-brand text-white' : 'bg-surface-overlay text-zinc-400'
+              }`}
+            >
+              {s}s
+            </button>
+          ))}
+        </div>
+      </Card>
+
       {/* Default RIR */}
       <Card className="space-y-3">
         <h3 className="text-sm text-zinc-400 font-medium">Default RIR Target</h3>

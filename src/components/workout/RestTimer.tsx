@@ -3,11 +3,22 @@ import { useState, useEffect, useCallback } from 'react';
 interface RestTimerProps {
   targetSeconds: number;
   startedAt: number;
+  adjustSeconds?: number;
+  onAdjust?: (deltaSeconds: number) => void;
   onDismiss: () => void;
 }
 
-export function RestTimer({ targetSeconds, startedAt, onDismiss }: RestTimerProps) {
-  const [remaining, setRemaining] = useState(targetSeconds);
+export function RestTimer({
+  targetSeconds,
+  startedAt,
+  adjustSeconds = 15,
+  onAdjust,
+  onDismiss,
+}: RestTimerProps) {
+  const [remaining, setRemaining] = useState(() => {
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    return targetSeconds - elapsed;
+  });
   const [hasAlerted, setHasAlerted] = useState(false);
 
   const triggerAlert = useCallback(() => {
@@ -44,7 +55,7 @@ export function RestTimer({ targetSeconds, startedAt, onDismiss }: RestTimerProp
   }, [hasAlerted]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    const tick = () => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
       const r = targetSeconds - elapsed;
       setRemaining(r);
@@ -52,7 +63,10 @@ export function RestTimer({ targetSeconds, startedAt, onDismiss }: RestTimerProp
       if (r <= 0 && !hasAlerted) {
         triggerAlert();
       }
-    }, 100);
+    };
+
+    tick();
+    const timer = setInterval(tick, 100);
     return () => clearInterval(timer);
   }, [startedAt, targetSeconds, hasAlerted, triggerAlert]);
 
@@ -61,7 +75,9 @@ export function RestTimer({ targetSeconds, startedAt, onDismiss }: RestTimerProp
   const minutes = Math.floor(displaySeconds / 60);
   const secs = displaySeconds % 60;
 
-  const progress = Math.min(1, (targetSeconds - remaining) / targetSeconds);
+  const progress = targetSeconds > 0
+    ? Math.min(1, (targetSeconds - remaining) / targetSeconds)
+    : 1;
 
   return (
     <div className={`rounded-xl p-4 text-center transition-colors ${
@@ -80,6 +96,27 @@ export function RestTimer({ targetSeconds, startedAt, onDismiss }: RestTimerProp
             className="h-full bg-brand transition-all duration-200"
             style={{ width: `${progress * 100}%` }}
           />
+        </div>
+      )}
+
+      {onAdjust && (
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            aria-label={`Subtract ${adjustSeconds} seconds`}
+            onClick={() => onAdjust(-adjustSeconds)}
+            className="min-w-[44px] h-11 px-3 rounded-full bg-surface flex items-center justify-center text-sm font-bold active:bg-surface-overlay"
+          >
+            −{adjustSeconds}s
+          </button>
+          <button
+            type="button"
+            aria-label={`Add ${adjustSeconds} seconds`}
+            onClick={() => onAdjust(adjustSeconds)}
+            className="min-w-[44px] h-11 px-3 rounded-full bg-surface flex items-center justify-center text-sm font-bold active:bg-surface-overlay"
+          >
+            +{adjustSeconds}s
+          </button>
         </div>
       )}
 

@@ -184,6 +184,7 @@ export function ActiveWorkoutPage() {
     restTimerTarget,
     exerciseStartTime,
     dismissRestTimer,
+    adjustRestTimer,
     substituteExercise,
     newPRs,
     dismissPRs,
@@ -205,6 +206,7 @@ export function ActiveWorkoutPage() {
   const [setFlash, setSetFlash] = useState(false);
   const [units, setUnits] = useState<WeightUnit>('kg');
   const [weightIncrement, setWeightIncrement] = useState(2.5);
+  const [restTimerAdjustSeconds, setRestTimerAdjustSeconds] = useState(15);
   const [summary, setSummary] = useState<{
     setCount: number;
     volume: number;
@@ -216,6 +218,7 @@ export function ActiveWorkoutPage() {
     getSettings().then(s => {
       setUnits(s.units);
       setWeightIncrement(s.weightIncrement);
+      setRestTimerAdjustSeconds(s.restTimerAdjustSeconds);
     });
   }, []);
 
@@ -540,6 +543,8 @@ export function ActiveWorkoutPage() {
           <RestTimer
             targetSeconds={restTimerTarget}
             startedAt={lastSetCompletedAt}
+            adjustSeconds={restTimerAdjustSeconds}
+            onAdjust={adjustRestTimer}
             onDismiss={dismissRestTimer}
           />
         )}

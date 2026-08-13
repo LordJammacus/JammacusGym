@@ -113,7 +113,7 @@ export const db = new GymDatabase();
 
 export async function getSettings(): Promise<UserSettings> {
   const existing = await db.userSettings.get('default');
-  if (existing) return existing;
+  if (existing) return { ...DEFAULT_SETTINGS, ...existing };
 
   const settings = { ...DEFAULT_SETTINGS, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   await db.userSettings.put(settings);

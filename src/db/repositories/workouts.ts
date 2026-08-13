@@ -32,6 +32,10 @@ export async function putTemplateExercise(te: TemplateExercise): Promise<void> {
   await db.templateExercises.put(te);
 }
 
+export async function getTemplateExercise(id: string): Promise<TemplateExercise | undefined> {
+  return db.templateExercises.get(id);
+}
+
 export async function deleteTemplateExercise(id: string): Promise<void> {
   await db.transaction('rw', [db.templateExercises, db.setTargets], async () => {
     await db.setTargets.where('templateExerciseId').equals(id).delete();

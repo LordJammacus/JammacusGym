@@ -79,6 +79,12 @@ export function TemplateEditorPage() {
     load();
   };
 
+  const handleRestChange = async (te: TemplateExercise, restSeconds: number) => {
+    const next = Math.max(0, Math.round(restSeconds));
+    await workoutsRepo.putTemplateExercise({ ...te, restSeconds: next });
+    setExercises(exercises.map(e => e.id === te.id ? { ...e, restSeconds: next } : e));
+  };
+
   return (
     <div className="p-4 space-y-4">
       <button onClick={() => navigate('/workout')} className="text-brand-light text-sm">
@@ -105,8 +111,18 @@ export function TemplateEditorPage() {
                   )}
                   <span className="font-medium">{exerciseNames.get(te.exerciseId) ?? 'Unknown'}</span>
                 </div>
-                <div className="text-sm text-zinc-400">
-                  {(setTargets.get(te.id) ?? []).length} sets · {te.restSeconds}s rest
+                <div className="text-sm text-zinc-400 mt-1 flex items-center gap-2">
+                  <span>{(setTargets.get(te.id) ?? []).length} sets ·</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={5}
+                    aria-label={`Rest seconds for ${exerciseNames.get(te.exerciseId) ?? 'exercise'}`}
+                    value={te.restSeconds}
+                    onChange={e => handleRestChange(te, +e.target.value || 0)}
+                    className="w-16 bg-surface-overlay rounded px-2 py-1 text-sm text-white text-center"
+                  />
+                  <span>s rest</span>
                 </div>
               </div>
               <div className="flex gap-1">
@@ -164,6 +180,7 @@ export function TemplateEditorPage() {
         open={editingSets !== null}
         onClose={() => setEditingSets(null)}
         templateExerciseId={editingSets}
+        restSeconds={editingSets ? (exercises.find(e => e.id === editingSets)?.restSeconds ?? 0) : 0}
         targets={editingSets ? (setTargets.get(editingSets) ?? []) : []}
         onSave={load}
       />
@@ -219,18 +236,24 @@ function EditSetsModal({
   open,
   onClose,
   templateExerciseId,
+  restSeconds: initialRestSeconds,
   targets,
   onSave,
 }: {
   open: boolean;
   onClose: () => void;
   templateExerciseId: string | null;
+  restSeconds: number;
   targets: SetTarget[];
   onSave: () => void;
 }) {
   const [sets, setSets] = useState<SetTarget[]>([]);
+  const [restSeconds, setRestSeconds] = useState(initialRestSeconds);
 
-  useEffect(() => { setSets([...targets]); }, [targets]);
+  useEffect(() => {
+    setSets([...targets]);
+    setRestSeconds(initialRestSeconds);
+  }, [targets, initialRestSeconds]);
 
   if (!templateExerciseId) return null;
 
@@ -259,6 +282,10 @@ function EditSetsModal({
 
   const handleSave = async () => {
     await workoutsRepo.replaceSetTargets(templateExerciseId, sets);
+    const te = await workoutsRepo.getTemplateExercise(templateExerciseId);
+    if (te) {
+      await workoutsRepo.putTemplateExercise({ ...te, restSeconds: Math.max(0, Math.round(restSeconds) || 0) });
+    }
     onSave();
     onClose();
   };
@@ -266,6 +293,18 @@ function EditSetsModal({
   return (
     <Modal open={open} onClose={onClose} title="Edit Sets">
       <div className="space-y-3">
+        <div className="flex items-center justify-between bg-surface-overlay rounded-lg p-3">
+          <span className="text-sm text-zinc-400">Rest (seconds)</span>
+          <input
+            type="number"
+            min={0}
+            step={5}
+            aria-label="Rest seconds"
+            value={restSeconds}
+            onChange={e => setRestSeconds(+e.target.value || 0)}
+            className="w-20 bg-surface rounded px-2 py-1.5 text-sm text-white text-center"
+          />
+        </div>
         {sets.map((s, i) => (
           <div key={s.id} className="flex items-center gap-2 bg-surface-overlay rounded-lg p-2">
             <span className="text-sm text-zinc-400 w-8">#{i + 1}</span>

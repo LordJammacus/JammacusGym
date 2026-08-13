@@ -21,6 +21,7 @@ export interface UserSettings {
   units: WeightUnit;
   weekStartDay: number;
   defaultRestSeconds: number;
+  restTimerAdjustSeconds: number;
   defaultRir: number;
   defaultProgressionStrategy: ProgressionStrategy;
   theme: Theme;

@@ -43,6 +43,7 @@ interface WorkoutState {
   abandonWorkout: () => Promise<void>;
   restoreWorkout: () => Promise<boolean>;
   dismissRestTimer: () => void;
+  adjustRestTimer: (deltaSeconds: number) => void;
   substituteExercise: (exerciseIndex: number, newExerciseId: string) => Promise<void>;
   newPRs: PersonalRecord[];
   dismissPRs: () => void;
@@ -271,6 +272,12 @@ export const useWorkoutStore = create<WorkoutState>()(
 
       dismissRestTimer: () => {
         set({ restTimerTarget: null });
+      },
+
+      adjustRestTimer: (deltaSeconds) => {
+        const state = get();
+        if (state.restTimerTarget == null) return;
+        set({ restTimerTarget: Math.max(0, state.restTimerTarget + deltaSeconds) });
       },
 
       substituteExercise: async (exerciseIndex, newExerciseId) => {

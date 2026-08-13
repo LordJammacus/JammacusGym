@@ -5,6 +5,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   units: 'kg',
   weekStartDay: 1,
   defaultRestSeconds: 120,
+  restTimerAdjustSeconds: 15,
   defaultRir: 2,
   defaultProgressionStrategy: 'double',
   theme: 'dark',
