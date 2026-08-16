@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import * as instancesRepo from '@/db/repositories/instances';
+import { countRemainingPlannedSets, getResumeCta, historyStatusLabel } from '@/utils/workoutResume';
+import { ResumeConflictModal, useResumeWorkout } from '@/hooks/useResumeWorkout';
 import type { WorkoutInstance } from '@/types/entities';
 
 interface WorkoutSummary {
   instance: WorkoutInstance;
   exerciseCount: number;
   setCount: number;
+  remainingSets: number;
 }
 
 export function HistoryPage() {
   const navigate = useNavigate();
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const { resume, busyId, conflict, dismissConflict } = useResumeWorkout();
 
   useEffect(() => {
     const load = async () => {
@@ -23,7 +27,13 @@ export function HistoryPage() {
       for (const inst of instances) {
         const exercises = await instancesRepo.getExerciseInstances(inst.id);
         const sets = await instancesRepo.getAllCompletedSetsForWorkout(inst.id);
-        summaries.push({ instance: inst, exerciseCount: exercises.length, setCount: sets.length });
+        const targets = await instancesRepo.resolveSessionSetTargets(inst, exercises);
+        summaries.push({
+          instance: inst,
+          exerciseCount: exercises.length,
+          setCount: sets.length,
+          remainingSets: countRemainingPlannedSets(exercises, sets, targets),
+        });
       }
 
       setWorkouts(summaries);
@@ -57,33 +67,48 @@ export function HistoryPage() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {workouts.map(({ instance, exerciseCount, setCount }) => (
-            <button
-              key={instance.id}
-              onClick={() => navigate(`/history/${instance.id}`)}
-              className="w-full text-left"
-            >
-              <Card>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold">{instance.templateName}</h3>
-                    <p className="text-sm text-zinc-400">{formatDate(instance.startedAt)}</p>
+          {workouts.map(({ instance, exerciseCount, setCount, remainingSets }) => {
+            const status = historyStatusLabel(instance.status, remainingSets);
+            const cta = getResumeCta(instance.status, remainingSets);
+            return (
+              <Card key={instance.id}>
+                <button
+                  onClick={() => navigate(`/history/${instance.id}`)}
+                  className="w-full text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold">{instance.templateName}</h3>
+                      <p className="text-sm text-zinc-400">{formatDate(instance.startedAt)}</p>
+                    </div>
+                    <div className="text-right text-sm">
+                      <p className="text-zinc-300">{formatDuration(instance.durationSeconds)}</p>
+                      <p className="text-zinc-400">
+                        {exerciseCount} exercise{exerciseCount !== 1 ? 's' : ''} · {setCount} set{setCount !== 1 ? 's' : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right text-sm">
-                    <p className="text-zinc-300">{formatDuration(instance.durationSeconds)}</p>
-                    <p className="text-zinc-400">
-                      {exerciseCount} exercise{exerciseCount !== 1 ? 's' : ''} · {setCount} set{setCount !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </div>
-                {instance.status === 'abandoned' && (
-                  <span className="text-xs text-red-400 mt-1 inline-block">Abandoned</span>
+                  {status && (
+                    <span className={`text-xs mt-1 inline-block ${status.className}`}>{status.text}</span>
+                  )}
+                </button>
+                {cta && (
+                  <Button
+                    size="sm"
+                    className="w-full mt-3"
+                    disabled={busyId === instance.id}
+                    onClick={() => resume(instance.id)}
+                  >
+                    {busyId === instance.id ? 'Opening…' : cta.label}
+                  </Button>
                 )}
               </Card>
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      <ResumeConflictModal open={conflict} onClose={dismissConflict} />
     </div>
   );
 }

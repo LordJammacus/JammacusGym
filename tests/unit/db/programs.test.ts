@@ -140,6 +140,15 @@ describe('determineNextWorkout', () => {
     expect(next?.templateId).toBe(pull);
   });
 
+  it('ignores paused sessions so rotation does not skip ahead', async () => {
+    await db.workoutInstances.bulkPut([
+      instance('i1', push, 'completed', '2026-08-10T10:00:00.000Z'),
+      instance('i2', pull, 'paused', '2026-08-12T10:00:00.000Z'),
+    ]);
+    const next = await determineNextWorkout(programId);
+    expect(next?.templateId).toBe(pull);
+  });
+
   it('wraps to the first template after completing the last in the block', async () => {
     await db.workoutInstances.put(instance('i1', legs, 'completed', '2026-08-10T10:00:00.000Z', programId));
     const next = await determineNextWorkout(programId);

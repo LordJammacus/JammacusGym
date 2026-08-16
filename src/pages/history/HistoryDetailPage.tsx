@@ -6,7 +6,9 @@ import * as exercisesRepo from '@/db/repositories/exercises';
 import { getSettings } from '@/db/database';
 import { generateId } from '@/utils/ids';
 import { formatVolume, formatWeight } from '@/utils/units';
-import type { WorkoutInstance, WorkoutExerciseInstance, CompletedSet } from '@/types/entities';
+import { countRemainingPlannedSets, getResumeCta, historyStatusLabel } from '@/utils/workoutResume';
+import { ResumeConflictModal, useResumeWorkout } from '@/hooks/useResumeWorkout';
+import type { WorkoutInstance, WorkoutExerciseInstance, CompletedSet, SetTarget } from '@/types/entities';
 import type { WeightUnit } from '@/types/enums';
 
 interface ExerciseBreakdown {
@@ -31,6 +33,8 @@ export function HistoryDetailPage() {
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, SetDraft[]>>({});
   const [saving, setSaving] = useState(false);
+  const [setTargets, setSetTargets] = useState<SetTarget[][]>([]);
+  const { resume, busyId, conflict, dismissConflict } = useResumeWorkout();
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -51,6 +55,7 @@ export function HistoryDetailPage() {
     }
 
     setExercises(breakdowns);
+    setSetTargets(await instancesRepo.resolveSessionSetTargets(inst, eis));
     setLoading(false);
   }, [id, navigate]);
 
@@ -189,6 +194,13 @@ export function HistoryDetailPage() {
   );
 
   const totalSets = exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
+  const remainingSets = countRemainingPlannedSets(
+    exercises.map(ex => ex.exerciseInstance),
+    exercises.flatMap(ex => ex.sets),
+    setTargets,
+  );
+  const status = historyStatusLabel(instance.status, remainingSets);
+  const cta = getResumeCta(instance.status, remainingSets);
 
   return (
     <div className="p-4 space-y-4">
@@ -213,10 +225,24 @@ export function HistoryDetailPage() {
       <div>
         <h1 className="text-2xl font-bold">{instance.templateName}</h1>
         <p className="text-sm text-zinc-400">{formatDate(instance.startedAt)} at {formatTime(instance.startedAt)}</p>
-        {instance.status === 'abandoned' && (
-          <span className="text-xs text-red-400 mt-1 inline-block">Abandoned</span>
+        {status && (
+          <span className={`text-xs mt-1 inline-block ${status.className}`}>{status.text}</span>
         )}
       </div>
+
+      {cta && !editing && (
+        <Button
+          className="w-full"
+          disabled={busyId === instance.id}
+          onClick={() => resume(instance.id)}
+        >
+          {busyId === instance.id
+            ? 'Opening…'
+            : remainingSets > 0
+              ? `${cta.label} · ${remainingSets} set${remainingSets !== 1 ? 's' : ''} left`
+              : cta.label}
+        </Button>
+      )}
 
       <div className="grid grid-cols-3 gap-3">
         <Card>
@@ -311,6 +337,8 @@ export function HistoryDetailPage() {
           );
         })}
       </div>
+
+      <ResumeConflictModal open={conflict} onClose={dismissConflict} />
     </div>
   );
 }

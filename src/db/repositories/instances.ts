@@ -1,5 +1,6 @@
 import { db } from '../database';
-import type { WorkoutInstance, WorkoutExerciseInstance, CompletedSet } from '@/types/entities';
+import type { WorkoutInstance, WorkoutExerciseInstance, CompletedSet, SetTarget } from '@/types/entities';
+import * as workoutsRepo from './workouts';
 
 export async function createWorkoutInstance(instance: WorkoutInstance): Promise<void> {
   await db.workoutInstances.put(instance);
@@ -18,11 +19,29 @@ export async function getInProgressWorkout(): Promise<WorkoutInstance | undefine
 }
 
 export async function getHistoryWorkouts(): Promise<WorkoutInstance[]> {
-  return db.workoutInstances
-    .where('status')
-    .anyOf(['completed', 'abandoned'])
-    .reverse()
-    .sortBy('startedAt');
+  const all = await db.workoutInstances.orderBy('startedAt').reverse().toArray();
+  const unfinished = all.filter(i => i.status === 'in_progress' || i.status === 'paused');
+  const finished = all.filter(i => i.status === 'completed' || i.status === 'abandoned');
+  return [...unfinished, ...finished];
+}
+
+export async function resolveSessionSetTargets(
+  instance: WorkoutInstance,
+  exerciseInstances: WorkoutExerciseInstance[],
+): Promise<SetTarget[][]> {
+  if (instance.sessionSetTargets && instance.sessionSetTargets.length === exerciseInstances.length) {
+    return instance.sessionSetTargets;
+  }
+
+  const targets: SetTarget[][] = [];
+  for (const ei of exerciseInstances) {
+    if (ei.templateExerciseId) {
+      targets.push(await workoutsRepo.getSetTargets(ei.templateExerciseId));
+    } else {
+      targets.push([]);
+    }
+  }
+  return targets;
 }
 
 /** @deprecated Use getHistoryWorkouts — name was misleading (includes abandoned). */

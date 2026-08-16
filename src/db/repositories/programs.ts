@@ -143,7 +143,7 @@ export async function determineNextWorkout(programId: string): Promise<{
     .sortBy('startedAt');
 
   // Starts historically omitted programId. Count completed sessions of this
-  // block's templates; abandoned/in-progress never happened for rotation.
+  // block's templates; abandoned/paused/in-progress never happened for rotation.
   const lastWorkout = [...completed].reverse().find(i => {
     if (!i.workoutTemplateId || !templateIds.has(i.workoutTemplateId)) return false;
     return i.programId === programId || i.programId === null;

@@ -7,6 +7,9 @@ import * as instancesRepo from '@/db/repositories/instances';
 import * as workoutsRepo from '@/db/repositories/workouts';
 import * as prRepo from '@/db/repositories/personalRecords';
 import { detectPersonalRecords } from '@/engines/analytics/records';
+import { findResumeCursor } from '@/utils/workoutResume';
+
+export type ResumeWorkoutResult = 'ok' | 'already_active' | 'active_conflict' | 'not_found';
 
 interface SetInput {
   weight: number;
@@ -41,6 +44,8 @@ interface WorkoutState {
   addSet: () => void;
   finishWorkout: () => Promise<void>;
   abandonWorkout: () => Promise<void>;
+  pauseWorkout: () => Promise<void>;
+  resumeWorkout: (instanceId: string) => Promise<ResumeWorkoutResult>;
   restoreWorkout: () => Promise<boolean>;
   dismissRestTimer: () => void;
   adjustRestTimer: (deltaSeconds: number) => void;
@@ -71,12 +76,13 @@ export const useWorkoutStore = create<WorkoutState>()(
       ...initialState,
 
       startWorkout: async (instance, exerciseInstances, setTargets) => {
-        await instancesRepo.createWorkoutInstance(instance);
+        const stored = { ...instance, sessionSetTargets: setTargets };
+        await instancesRepo.createWorkoutInstance(stored);
         await instancesRepo.createExerciseInstances(exerciseInstances);
 
         const now = Date.now();
         set({
-          instance,
+          instance: stored,
           exerciseInstances,
           setTargets,
           progressionResults: [],
@@ -253,9 +259,72 @@ export const useWorkoutStore = create<WorkoutState>()(
           status: 'abandoned',
           completedAt: new Date().toISOString(),
           durationSeconds,
+          sessionSetTargets: state.setTargets,
         });
 
         set(initialState);
+      },
+
+      pauseWorkout: async () => {
+        const state = get();
+        if (!state.instance) return;
+
+        const durationSeconds = state.workoutStartTime
+          ? Math.round((Date.now() - state.workoutStartTime) / 1000)
+          : null;
+
+        await instancesRepo.updateWorkoutInstance(state.instance.id, {
+          status: 'paused',
+          completedAt: null,
+          durationSeconds,
+          sessionSetTargets: state.setTargets,
+        });
+
+        set(initialState);
+      },
+
+      resumeWorkout: async (instanceId) => {
+        const current = get().instance;
+        if (current?.id === instanceId) return 'already_active';
+        if (current) return 'active_conflict';
+
+        const instance = await instancesRepo.getWorkoutInstance(instanceId);
+        if (!instance) return 'not_found';
+
+        const exerciseInstances = await instancesRepo.getExerciseInstances(instanceId);
+        const completedSets = await instancesRepo.getAllCompletedSetsForWorkout(instanceId);
+        const setTargets = await instancesRepo.resolveSessionSetTargets(instance, exerciseInstances);
+        const { exerciseIndex, setIndex } = findResumeCursor(exerciseInstances, completedSets, setTargets);
+
+        const resumed = {
+          ...instance,
+          status: 'in_progress' as const,
+          completedAt: null,
+          sessionSetTargets: setTargets,
+        };
+        await instancesRepo.updateWorkoutInstance(instanceId, {
+          status: 'in_progress',
+          completedAt: null,
+          sessionSetTargets: setTargets,
+        });
+
+        const now = Date.now();
+        const priorMs = (instance.durationSeconds ?? 0) * 1000;
+        set({
+          instance: resumed,
+          exerciseInstances,
+          completedSets,
+          setTargets,
+          progressionResults: [],
+          currentExerciseIndex: exerciseIndex,
+          currentSetIndex: setIndex,
+          workoutStartTime: now - priorMs,
+          lastSetCompletedAt: null,
+          restTimerTarget: null,
+          exerciseStartTime: now,
+          newPRs: [],
+        });
+        return 'ok';
       },
 
       restoreWorkout: async () => {

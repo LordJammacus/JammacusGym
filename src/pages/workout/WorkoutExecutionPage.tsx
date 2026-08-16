@@ -185,6 +185,7 @@ export function ActiveWorkoutPage() {
     goToExercise,
     finishWorkout,
     abandonWorkout,
+    pauseWorkout,
     workoutStartTime,
     lastSetCompletedAt,
     restTimerTarget,
@@ -334,6 +335,11 @@ export function ActiveWorkoutPage() {
     navigate('/workout', { replace: true });
   }, [abandonWorkout, navigate]);
 
+  const handlePause = useCallback(async () => {
+    await pauseWorkout();
+    navigate('/history', { replace: true });
+  }, [pauseWorkout, navigate]);
+
   if ((!instance || !currentExercise) && !showSummary) return null;
 
   const formatTime = (s: number) => {
@@ -458,7 +464,8 @@ export function ActiveWorkoutPage() {
               <span>Ex: {formatTime(exerciseElapsed)}</span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 justify-end">
+            <Button size="sm" variant="ghost" onClick={handlePause}>Finish later</Button>
             <Button size="sm" variant="ghost" onClick={() => setShowAbandon(true)}>Abandon</Button>
             <Button size="sm" onClick={() => setShowFinish(true)} disabled={completedSets.length === 0}>
               Finish
@@ -744,7 +751,7 @@ export function ActiveWorkoutPage() {
       <Modal open={showAbandon} onClose={() => setShowAbandon(false)} title="Abandon Workout?">
         <div className="space-y-4">
           <p className="text-zinc-300">
-            Logged sets stay in History for your records, but abandoned workouts are ignored for analytics, progression, and recommendations.
+            Logged sets stay in History. You can finish remaining sets from History later, but abandoned workouts are ignored for analytics, progression, and recommendations until you complete them.
           </p>
           <div className="flex gap-3">
             <Button variant="secondary" className="flex-1" onClick={() => setShowAbandon(false)}>Cancel</Button>

@@ -120,6 +120,8 @@ export interface WorkoutInstance {
   completedAt: string | null;
   durationSeconds: number | null;
   notes: string;
+  /** In-session planned targets, snapshotted so resume uses the same weights. */
+  sessionSetTargets?: SetTarget[][] | null;
   createdAt: string;
 }
 

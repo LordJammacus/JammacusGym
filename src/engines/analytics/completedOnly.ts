@@ -1,6 +1,6 @@
 import type { WorkoutInstance } from '@/types/entities';
 
-/** Abandoned (and in-progress) workouts are history-only — never feed analytics/engines. */
+/** Abandoned, paused, and in-progress workouts are history-only — never feed analytics/engines. */
 export function completedWorkoutsOnly<T extends Pick<WorkoutInstance, 'status'>>(
   workouts: T[],
 ): T[] {

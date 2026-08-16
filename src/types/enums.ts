@@ -26,7 +26,7 @@ export type MovementPattern =
 
 export type SetType = 'working' | 'warmup' | 'drop' | 'failure' | 'backoff' | 'additional';
 export type MuscleRole = 'primary' | 'secondary';
-export type WorkoutStatus = 'in_progress' | 'completed' | 'abandoned';
+export type WorkoutStatus = 'in_progress' | 'paused' | 'completed' | 'abandoned';
 export type WorkoutGoal =
   | 'hypertrophy'
   | 'strength'
