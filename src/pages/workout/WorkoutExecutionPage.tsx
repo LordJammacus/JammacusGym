@@ -17,6 +17,7 @@ import { calculateProgression } from '@/engines/progression';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { generateId } from '@/utils/ids';
 import { haptic } from '@/utils/haptics';
+import { unlockAudio } from '@/utils/audio';
 import { formatVolume, formatWeight, roundToIncrement } from '@/utils/units';
 
 export function StartWorkoutPage() {
@@ -152,7 +153,10 @@ export function StartWorkoutPage() {
             </Card>
           ))}
         </div>
-        <Button className="w-full" onClick={() => navigate('/workout/active', { replace: true })}>
+        <Button className="w-full" onClick={() => {
+          unlockAudio();
+          navigate('/workout/active', { replace: true });
+        }}>
           Let's Go
         </Button>
       </div>
@@ -316,6 +320,7 @@ export function ActiveWorkoutPage() {
   }, [currentExerciseIndex, currentSetIdx]);
 
   const handleCompleteSet = useCallback(async () => {
+    unlockAudio();
     haptic('success');
     setSetFlash(true);
     setTimeout(() => setSetFlash(false), 400);

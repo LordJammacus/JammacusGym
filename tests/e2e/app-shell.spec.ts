@@ -30,6 +30,11 @@ test.describe('App Shell', () => {
     await expect(page).toHaveURL('/analytics');
     await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible();
 
+    await page.getByRole('link', { name: 'More' }).click();
+    await expect(page).toHaveURL('/more');
+    await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
+    await expect(page.getByText('Settings')).toBeVisible();
+
     await page.getByRole('link', { name: 'Today' }).click();
     await expect(page).toHaveURL('/');
   });

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { playRestCompleteChime, unlockAudio } from '@/utils/audio';
 
 interface RestTimerProps {
   targetSeconds: number;
@@ -29,29 +30,7 @@ export function RestTimer({
       navigator.vibrate([200, 100, 200]);
     }
 
-    try {
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      gain.gain.value = 0.3;
-      osc.start();
-      osc.stop(ctx.currentTime + 0.15);
-      setTimeout(() => {
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-        osc2.frequency.value = 1100;
-        gain2.gain.value = 0.3;
-        osc2.start();
-        osc2.stop(ctx.currentTime + 0.15);
-      }, 200);
-    } catch {
-      // Audio not supported
-    }
+    playRestCompleteChime();
   }, [hasAlerted]);
 
   useEffect(() => {
@@ -104,7 +83,10 @@ export function RestTimer({
           <button
             type="button"
             aria-label={`Subtract ${adjustSeconds} seconds`}
-            onClick={() => onAdjust(-adjustSeconds)}
+            onClick={() => {
+              unlockAudio();
+              onAdjust(-adjustSeconds);
+            }}
             className="min-w-[44px] h-11 px-3 rounded-full bg-surface flex items-center justify-center text-sm font-bold active:bg-surface-overlay"
           >
             −{adjustSeconds}s
@@ -112,7 +94,10 @@ export function RestTimer({
           <button
             type="button"
             aria-label={`Add ${adjustSeconds} seconds`}
-            onClick={() => onAdjust(adjustSeconds)}
+            onClick={() => {
+              unlockAudio();
+              onAdjust(adjustSeconds);
+            }}
             className="min-w-[44px] h-11 px-3 rounded-full bg-surface flex items-center justify-center text-sm font-bold active:bg-surface-overlay"
           >
             +{adjustSeconds}s
