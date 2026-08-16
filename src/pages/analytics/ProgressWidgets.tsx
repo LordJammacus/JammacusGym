@@ -1,4 +1,4 @@
-import type { ExerciseProgressSummary, MetricDelta } from '@/types/analytics';
+import type { ExerciseProgressSummary, MetricDelta, SessionSetSnapshot } from '@/types/analytics';
 import type { WeightUnit } from '@/types/enums';
 import { formatWeight } from '@/utils/units';
 import { deltaClass, formatDelta, trendClass, trendLabel } from './helpers';
@@ -39,6 +39,42 @@ export function DeltaText({ value, suffix = '' }: { value: number; suffix?: stri
   );
 }
 
+export function formatSetScheme(
+  point: { weight: number; reps: number; sets: SessionSetSnapshot[] },
+  units: WeightUnit,
+): string {
+  if (point.sets.length === 0) {
+    return `${formatWeight(point.weight, units)} × ${point.reps}`;
+  }
+
+  const firstWeight = point.sets[0]!.weight;
+  const sameWeight = point.sets.every(s => s.weight === firstWeight);
+  if (sameWeight) {
+    return `${formatWeight(firstWeight, units)} × ${point.sets.map(s => s.reps).join('/')}`;
+  }
+
+  return point.sets.map(s => `${formatWeight(s.weight, units)}×${s.reps}`).join(', ');
+}
+
+export function SessionDelta({ delta, units }: { delta: MetricDelta; units: WeightUnit }) {
+  const showWeight = delta.weight !== 0;
+  const showReps = delta.totalReps !== 0;
+  const showVolume = !showWeight && !showReps && delta.volumeLoad !== 0;
+
+  if (!showWeight && !showReps && !showVolume) {
+    return <DeltaText value={0} suffix=" reps" />;
+  }
+
+  return (
+    <span className="font-medium">
+      {showWeight && <DeltaText value={delta.weight} suffix={units} />}
+      {showWeight && showReps && <span className="text-zinc-600"> · </span>}
+      {showReps && <DeltaText value={delta.totalReps} suffix=" reps" />}
+      {showVolume && <DeltaText value={delta.volumeLoad} suffix={` ${units}`} />}
+    </span>
+  );
+}
+
 export function ExerciseProgressRow({
   summary,
   units,
@@ -48,8 +84,10 @@ export function ExerciseProgressRow({
   units: WeightUnit;
   onClick: () => void;
 }) {
-  const sparkValues = summary.trend.movingAverages.map(p => p.value);
-  const lastSet = `${formatWeight(summary.latest.weight, units)} × ${summary.latest.reps}`;
+  const sparkValues = summary.trend.volumeMovingAverages.length > 1
+    ? summary.trend.volumeMovingAverages.map(p => p.value)
+    : summary.trend.movingAverages.map(p => p.value);
+  const lastSet = formatSetScheme(summary.latest, units);
 
   return (
     <button onClick={onClick} className="w-full text-left min-h-[44px]">
@@ -60,11 +98,11 @@ export function ExerciseProgressRow({
             <TrendBadge direction={summary.trend.direction} />
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-400">
-            <span>{lastSet}</span>
+            <span className="truncate">{lastSet}</span>
             {summary.vsPrevious && (
               <>
                 <span className="text-zinc-600">·</span>
-                <DeltaText value={summary.vsPrevious.estimated1RM} suffix={` ${units} e1RM`} />
+                <SessionDelta delta={summary.vsPrevious} units={units} />
               </>
             )}
           </div>
@@ -84,7 +122,9 @@ export function ExerciseProgressRow({
 export function formatMetricDelta(delta: MetricDelta, units: WeightUnit): string {
   const parts: string[] = [];
   if (delta.weight !== 0) parts.push(formatDelta(delta.weight, units));
-  if (delta.reps !== 0) parts.push(formatDelta(delta.reps, ' reps'));
+  if (delta.totalReps !== 0) parts.push(formatDelta(delta.totalReps, ' reps'));
+  else if (delta.reps !== 0) parts.push(formatDelta(delta.reps, ' best'));
+  if (parts.length === 0 && delta.volumeLoad !== 0) return formatDelta(delta.volumeLoad, ` ${units}`);
   if (parts.length === 0) return formatDelta(delta.estimated1RM, ` ${units} e1RM`);
   return parts.join('  ');
 }

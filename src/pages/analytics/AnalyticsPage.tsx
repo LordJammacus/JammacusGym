@@ -20,7 +20,7 @@ import {
   getLatestWorkoutDeltas,
 } from '@/engines/analytics';
 import { getSettings } from '@/db/database';
-import { formatVolume, formatWeight } from '@/utils/units';
+import { formatVolume } from '@/utils/units';
 import {
   TIME_PERIODS,
   chartColors,
@@ -29,7 +29,7 @@ import {
   formatChartDate,
   formatDisplayDate,
 } from './helpers';
-import { DeltaText, ExerciseProgressRow, formatMetricDelta } from './ProgressWidgets';
+import { ExerciseProgressRow, SessionDelta, formatMetricDelta, formatSetScheme } from './ProgressWidgets';
 
 type AnalyticsTab = 'progress' | 'volume';
 
@@ -167,7 +167,7 @@ export function AnalyticsPage() {
             <div className="space-y-2">
               <h2 className="text-lg font-semibold">Last workout</h2>
               <p className="text-xs text-zinc-500">
-                {latestWorkout.workoutName} · {formatDisplayDate(latestWorkout.date)} vs previous session
+                {latestWorkout.workoutName} · {formatDisplayDate(latestWorkout.date)} vs previous session (all working sets)
               </p>
               <Card className="space-y-3">
                 {latestWorkout.exercises.map(ex => (
@@ -178,15 +178,13 @@ export function AnalyticsPage() {
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-sm truncate">{ex.exerciseName}</p>
-                      <p className="text-xs text-zinc-400">
-                        {formatWeight(ex.current.weight, units)} × {ex.current.reps}
+                      <p className="text-xs text-zinc-400 truncate">
+                        {formatSetScheme(ex.current, units)}
                       </p>
                     </div>
                     {ex.vsPrevious ? (
                       <span className="text-xs shrink-0">
-                        <DeltaText value={ex.vsPrevious.weight} suffix={units} />
-                        <span className="text-zinc-600"> · </span>
-                        <DeltaText value={ex.vsPrevious.reps} suffix="r" />
+                        <SessionDelta delta={ex.vsPrevious} units={units} />
                       </span>
                     ) : (
                       <span className="text-xs text-zinc-500 shrink-0">First session</span>

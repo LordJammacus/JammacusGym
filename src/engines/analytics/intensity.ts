@@ -17,9 +17,13 @@ export function calculateVolumeLoad(weight: number, reps: number, sets: number):
   return weight * reps * sets;
 }
 
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 /**
  * Build a timeline of progression data points for a specific exercise.
- * Returns one point per workout session (best working set by estimated 1RM).
+ * One point per completed session: peak set (e1RM) plus all-set volume/reps.
  */
 export function buildExerciseProgression(
   sets: CompletedSet[],
@@ -57,10 +61,17 @@ export function buildExerciseProgression(
     const date = instanceDateMap.get(instanceId);
     if (!date) continue;
 
+    const working = [...sessionSetList].sort((a, b) => a.orderIndex - b.orderIndex);
+    if (working.length === 0) continue;
+
     let bestSet: CompletedSet | null = null;
     let best1RM = 0;
+    let totalVolume = 0;
+    let totalReps = 0;
 
-    for (const s of sessionSetList) {
+    for (const s of working) {
+      totalVolume += s.actualWeight * s.actualReps;
+      totalReps += s.actualReps;
       const e1rm = estimateOneRepMax(s.actualWeight, s.actualReps);
       if (e1rm > best1RM) {
         best1RM = e1rm;
@@ -68,19 +79,26 @@ export function buildExerciseProgression(
       }
     }
 
-    if (bestSet) {
-      const totalVolume = sessionSetList.reduce(
-        (acc, s) => acc + s.actualWeight * s.actualReps, 0,
-      );
+    if (!bestSet) continue;
 
-      points.push({
-        date: date.split('T')[0]!,
-        weight: bestSet.actualWeight,
-        reps: bestSet.actualReps,
-        estimated1RM: best1RM,
-        volumeLoad: Math.round(totalVolume),
-      });
-    }
+    const workingSets = working.length;
+    points.push({
+      date: date.split('T')[0]!,
+      weight: bestSet.actualWeight,
+      reps: bestSet.actualReps,
+      estimated1RM: best1RM,
+      volumeLoad: Math.round(totalVolume),
+      totalReps,
+      workingSets,
+      avgReps: round1(totalReps / workingSets),
+      minReps: Math.min(...working.map(s => s.actualReps)),
+      avgWeight: totalReps > 0 ? round1(totalVolume / totalReps) : bestSet.actualWeight,
+      sets: working.map(s => ({
+        orderIndex: s.orderIndex,
+        weight: s.actualWeight,
+        reps: s.actualReps,
+      })),
+    });
   }
 
   return points.sort((a, b) => a.date.localeCompare(b.date));

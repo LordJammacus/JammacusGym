@@ -24,8 +24,9 @@ import {
   formatDisplayDate,
   formatDelta,
   deltaClass,
+  setChartColors,
 } from './helpers';
-import { DeltaText, TrendBadge } from './ProgressWidgets';
+import { DeltaText, SessionDelta, TrendBadge, formatSetScheme } from './ProgressWidgets';
 
 export function ExerciseAnalyticsPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,14 +37,20 @@ export function ExerciseAnalyticsPage() {
   const [name, setName] = useState('Exercise');
   const [summary, setSummary] = useState<ExerciseProgressSummary | null>(null);
   const [sessions, setSessions] = useState<SessionComparisonPoint[]>([]);
+  const [setKeys, setSetKeys] = useState<string[]>([]);
   const [chartData, setChartData] = useState<{
     date: string;
     weight: number;
     reps: number;
+    totalReps: number;
+    avgReps: number;
+    minReps: number;
     estimated1RM: number;
     movingAvg: number;
     volumeLoad: number;
     e1rmDelta: number | null;
+    volumeDelta: number | null;
+    [key: string]: string | number | null;
   }[]>([]);
 
   const loadData = useCallback(async () => {
@@ -66,18 +73,31 @@ export function ExerciseAnalyticsPage() {
     const nextSummary = summarizeExerciseProgress(points, id, names.get(id) ?? 'Exercise');
     const compared = compareSessions(points);
     const trend = nextSummary?.trend;
+    const maxSets = points.reduce((max, p) => Math.max(max, p.sets.length), 0);
+    const keys = Array.from({ length: maxSets }, (_, i) => `set${i + 1}`);
 
     setSummary(nextSummary);
     setSessions([...compared].reverse());
-    setChartData(points.map((p, i) => ({
-      date: p.date,
-      weight: p.weight,
-      reps: p.reps,
-      estimated1RM: p.estimated1RM,
-      movingAvg: trend?.movingAverages[i]?.value ?? p.estimated1RM,
-      volumeLoad: p.volumeLoad,
-      e1rmDelta: compared[i]?.vsPrevious?.estimated1RM ?? null,
-    })));
+    setSetKeys(keys);
+    setChartData(points.map((p, i) => {
+      const row: Record<string, string | number | null> = {
+        date: p.date,
+        weight: p.weight,
+        reps: p.reps,
+        totalReps: p.totalReps,
+        avgReps: p.avgReps,
+        minReps: p.minReps,
+        estimated1RM: p.estimated1RM,
+        movingAvg: trend?.movingAverages[i]?.value ?? p.estimated1RM,
+        volumeLoad: p.volumeLoad,
+        e1rmDelta: compared[i]?.vsPrevious?.estimated1RM ?? null,
+        volumeDelta: compared[i]?.vsPrevious?.volumeLoad ?? null,
+      };
+      for (let s = 0; s < maxSets; s++) {
+        row[`set${s + 1}`] = p.sets[s]?.reps ?? null;
+      }
+      return row as typeof chartData[number];
+    }));
 
     setLoading(false);
   }, [id, period]);
@@ -85,6 +105,8 @@ export function ExerciseAnalyticsPage() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const deltaBars = chartData.filter(d => d.e1rmDelta !== null);
+  const volumeDeltaBars = chartData.filter(d => d.volumeDelta !== null);
+  const showSetBreakdown = setKeys.length > 1;
 
   return (
     <div className="p-4 space-y-5 pb-24">
@@ -124,10 +146,20 @@ export function ExerciseAnalyticsPage() {
           <div className="grid grid-cols-2 gap-3">
             <Card>
               <p className="text-xs text-zinc-400">Latest</p>
-              <p className="text-lg font-bold">{formatWeight(summary.latest.weight, units)} × {summary.latest.reps}</p>
+              <p className="text-lg font-bold leading-tight">{formatSetScheme(summary.latest, units)}</p>
               {summary.vsPrevious && (
                 <p className="text-xs mt-1">
-                  <DeltaText value={summary.vsPrevious.weight} suffix={units} />
+                  <SessionDelta delta={summary.vsPrevious} units={units} />
+                  <span className="text-zinc-600"> vs last</span>
+                </p>
+              )}
+            </Card>
+            <Card>
+              <p className="text-xs text-zinc-400">Total reps</p>
+              <p className="text-lg font-bold">{summary.latest.totalReps}</p>
+              {summary.vsPrevious && (
+                <p className="text-xs mt-1">
+                  <DeltaText value={summary.vsPrevious.totalReps} suffix=" reps" />
                   <span className="text-zinc-600"> vs last</span>
                 </p>
               )}
@@ -142,12 +174,22 @@ export function ExerciseAnalyticsPage() {
                 </p>
               )}
             </Card>
+            <Card>
+              <p className="text-xs text-zinc-400">Volume</p>
+              <p className="text-lg font-bold">{formatVolume(summary.latest.volumeLoad, units)}</p>
+              {summary.sessionCount > 1 && (
+                <p className="text-xs mt-1">
+                  <DeltaText value={summary.vsPeriodStart.volumeLoad} suffix={` ${units}`} />
+                  <span className="text-zinc-600"> this period</span>
+                </p>
+              )}
+            </Card>
           </div>
 
           {chartData.length > 1 && (
             <>
               <Card>
-                <h3 className="text-sm text-zinc-400 mb-3">Weight</h3>
+                <h3 className="text-sm text-zinc-400 mb-3">Weight (best set)</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
@@ -160,17 +202,45 @@ export function ExerciseAnalyticsPage() {
               </Card>
 
               <Card>
-                <h3 className="text-sm text-zinc-400 mb-3">Reps (best set)</h3>
+                <h3 className="text-sm text-zinc-400 mb-3">Total reps</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                     <XAxis dataKey="date" tickFormatter={formatChartDate} tick={{ fontSize: 11, fill: '#71717a' }} />
                     <YAxis tick={{ fontSize: 11, fill: '#71717a' }} allowDecimals={false} domain={['auto', 'auto']} />
                     <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#a1a1aa' }} />
-                    <Line type="monotone" dataKey="reps" stroke={chartColors.cyan} strokeWidth={2} dot={{ r: 3, fill: chartColors.cyan }} name="Reps" />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Line type="monotone" dataKey="totalReps" stroke={chartColors.cyan} strokeWidth={2} dot={{ r: 3, fill: chartColors.cyan }} name="Total" />
+                    <Line type="monotone" dataKey="avgReps" stroke={chartColors.amber} strokeWidth={2} strokeDasharray="4 4" dot={false} name="Avg / set" />
+                    <Line type="monotone" dataKey="minReps" stroke={chartColors.green} strokeWidth={2} strokeDasharray="4 4" dot={false} name="Weakest set" />
                   </LineChart>
                 </ResponsiveContainer>
               </Card>
+
+              {showSetBreakdown && (
+                <Card>
+                  <h3 className="text-sm text-zinc-400 mb-3">Reps by set</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                      <XAxis dataKey="date" tickFormatter={formatChartDate} tick={{ fontSize: 11, fill: '#71717a' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#71717a' }} allowDecimals={false} />
+                      <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#a1a1aa' }} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      {setKeys.map((key, i) => (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          stackId="reps"
+                          fill={setChartColors[i % setChartColors.length]}
+                          radius={i === setKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                          name={`Set ${i + 1}`}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
+              )}
 
               <Card>
                 <h3 className="text-sm text-zinc-400 mb-3">Estimated 1RM</h3>
@@ -200,6 +270,25 @@ export function ExerciseAnalyticsPage() {
                 </ResponsiveContainer>
               </Card>
 
+              {volumeDeltaBars.length > 0 && (
+                <Card>
+                  <h3 className="text-sm text-zinc-400 mb-3">Volume change vs previous session</h3>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={volumeDeltaBars}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                      <XAxis dataKey="date" tickFormatter={formatChartDate} tick={{ fontSize: 11, fill: '#71717a' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#71717a' }} />
+                      <Tooltip contentStyle={chartTooltipStyle} labelStyle={{ color: '#a1a1aa' }} />
+                      <Bar dataKey="volumeDelta" radius={[4, 4, 0, 0]} name={`Δ volume (${units})`}>
+                        {volumeDeltaBars.map((d, i) => (
+                          <Cell key={i} fill={(d.volumeDelta ?? 0) >= 0 ? chartColors.green : chartColors.red} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
+              )}
+
               {deltaBars.length > 0 && (
                 <Card>
                   <h3 className="text-sm text-zinc-400 mb-3">e1RM change vs previous session</h3>
@@ -225,28 +314,35 @@ export function ExerciseAnalyticsPage() {
             <h2 className="text-lg font-semibold">Session log</h2>
             {sessions.map(session => (
               <Card key={session.date}>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium">{formatDisplayDate(session.date)}</p>
                   {session.vsPrevious ? (
-                    <span className={`text-xs ${deltaClass(session.vsPrevious.estimated1RM)}`}>
-                      {formatDelta(session.vsPrevious.estimated1RM, ` ${units} e1RM`)}
+                    <span className="text-xs">
+                      <SessionDelta delta={session.vsPrevious} units={units} />
                     </span>
                   ) : (
                     <span className="text-xs text-zinc-500">First</span>
                   )}
                 </div>
+                <p className="text-sm font-semibold mt-2">{formatSetScheme(session, units)}</p>
                 <div className="grid grid-cols-3 gap-2 mt-2 text-center">
                   <div>
-                    <p className="text-sm font-semibold">{formatWeight(session.weight, units)}</p>
-                    <p className="text-[10px] text-zinc-500">Weight</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">{session.reps}</p>
-                    <p className="text-[10px] text-zinc-500">Reps</p>
+                    <p className="text-sm font-semibold">{session.totalReps}</p>
+                    <p className="text-[10px] text-zinc-500">Total reps</p>
                   </div>
                   <div>
                     <p className="text-sm font-semibold">{formatVolume(session.volumeLoad, units)}</p>
                     <p className="text-[10px] text-zinc-500">Volume</p>
+                  </div>
+                  <div>
+                    <p className={`text-sm font-semibold ${session.vsPrevious ? deltaClass(session.vsPrevious.estimated1RM) : ''}`}>
+                      {formatWeight(session.estimated1RM, units)}
+                    </p>
+                    <p className="text-[10px] text-zinc-500">
+                      {session.vsPrevious
+                        ? formatDelta(session.vsPrevious.estimated1RM, ` ${units} e1RM`)
+                        : 'e1RM'}
+                    </p>
                   </div>
                 </div>
               </Card>

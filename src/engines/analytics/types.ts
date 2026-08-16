@@ -3,6 +3,7 @@ export type {
   TimePeriod,
   MuscleVolumeEntry,
   WeeklyVolumePoint,
+  SessionSetSnapshot,
   ExerciseProgressionPoint,
   FrequencyPoint,
   WorkoutDurationPoint,

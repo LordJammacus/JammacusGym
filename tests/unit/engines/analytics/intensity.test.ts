@@ -40,10 +40,10 @@ describe('buildExerciseProgression', () => {
     ];
 
     const sets: CompletedSet[] = [
-      makeSet('s1', 'ei-1', 80, 10),
-      makeSet('s2', 'ei-1', 80, 8),
-      makeSet('s3', 'ei-2', 82.5, 10),
-      makeSet('s4', 'ei-2', 82.5, 9),
+      makeSet('s1', 'ei-1', 80, 10, 0),
+      makeSet('s2', 'ei-1', 80, 8, 1),
+      makeSet('s3', 'ei-2', 82.5, 10, 0),
+      makeSet('s4', 'ei-2', 82.5, 9, 1),
     ];
 
     const result = buildExerciseProgression(sets, exerciseInstances, instances, exerciseId);
@@ -51,9 +51,45 @@ describe('buildExerciseProgression', () => {
     expect(result).toHaveLength(2);
     expect(result[0]!.date).toBe('2026-01-01');
     expect(result[0]!.weight).toBe(80);
+    expect(result[0]!.reps).toBe(10);
+    expect(result[0]!.totalReps).toBe(18);
+    expect(result[0]!.minReps).toBe(8);
+    expect(result[0]!.workingSets).toBe(2);
+    expect(result[0]!.sets.map(s => s.reps)).toEqual([10, 8]);
     expect(result[0]!.estimated1RM).toBeGreaterThan(100);
     expect(result[1]!.weight).toBe(82.5);
+    expect(result[1]!.totalReps).toBe(19);
     expect(result[1]!.estimated1RM).toBeGreaterThan(result[0]!.estimated1RM);
+  });
+
+  it('captures later-set progress when the best set is unchanged', () => {
+    const exerciseId = 'ex-1';
+    const instances: WorkoutInstance[] = [
+      makeInstance('inst-1', '2026-01-01'),
+      makeInstance('inst-2', '2026-01-08'),
+    ];
+    const exerciseInstances: WorkoutExerciseInstance[] = [
+      makeEI('ei-1', 'inst-1', exerciseId),
+      makeEI('ei-2', 'inst-2', exerciseId),
+    ];
+    const sets: CompletedSet[] = [
+      makeSet('s1', 'ei-1', 80, 12, 0),
+      makeSet('s2', 'ei-1', 80, 11, 1),
+      makeSet('s3', 'ei-1', 80, 10, 2),
+      makeSet('s4', 'ei-1', 80, 9, 3),
+      makeSet('s5', 'ei-2', 80, 12, 0),
+      makeSet('s6', 'ei-2', 80, 12, 1),
+      makeSet('s7', 'ei-2', 80, 10, 2),
+      makeSet('s8', 'ei-2', 80, 9, 3),
+    ];
+
+    const result = buildExerciseProgression(sets, exerciseInstances, instances, exerciseId);
+    expect(result[0]!.reps).toBe(12);
+    expect(result[1]!.reps).toBe(12);
+    expect(result[0]!.estimated1RM).toBe(result[1]!.estimated1RM);
+    expect(result[1]!.totalReps).toBe(result[0]!.totalReps + 1);
+    expect(result[1]!.volumeLoad).toBeGreaterThan(result[0]!.volumeLoad);
+    expect(result[1]!.sets[1]!.reps).toBe(12);
   });
 
   it('excludes warmup sets from best set selection', () => {
@@ -127,11 +163,11 @@ function makeEI(id: string, workoutInstanceId: string, exerciseId: string): Work
   };
 }
 
-function makeSet(id: string, weiId: string, weight: number, reps: number): CompletedSet {
+function makeSet(id: string, weiId: string, weight: number, reps: number, orderIndex = 0): CompletedSet {
   return {
     id,
     workoutExerciseInstanceId: weiId,
-    orderIndex: 0,
+    orderIndex,
     setType: 'working',
     targetWeight: weight,
     targetRepMin: 8,

@@ -6,6 +6,8 @@ export { detectPersonalRecords } from './records';
 export {
   calculatePerformanceTrend,
   detectStagnation,
+  sessionImproved,
+  hasSetMatchedProgress,
   compareSessions,
   summarizeExerciseProgress,
   summarizeAllExercises,

@@ -35,7 +35,7 @@ export function makeTrend(
   direction: PerformanceTrendResult['direction'],
   slope = 0,
 ): PerformanceTrendResult {
-  return { slope, direction, dataPoints: 8, movingAverages: [] };
+  return { slope, direction, dataPoints: 8, movingAverages: [], volumeMovingAverages: [] };
 }
 
 export function makeVolume(

@@ -20,12 +20,26 @@ export interface WeeklyVolumePoint {
   totalVolume: number;
 }
 
+export interface SessionSetSnapshot {
+  orderIndex: number;
+  weight: number;
+  reps: number;
+}
+
 export interface ExerciseProgressionPoint {
   date: string;
+  /** Best working set weight (highest estimated 1RM). */
   weight: number;
+  /** Best working set reps. */
   reps: number;
   estimated1RM: number;
   volumeLoad: number;
+  totalReps: number;
+  workingSets: number;
+  avgReps: number;
+  minReps: number;
+  avgWeight: number;
+  sets: SessionSetSnapshot[];
 }
 
 export interface FrequencyPoint {
@@ -67,6 +81,7 @@ export interface PerformanceTrendResult {
   direction: 'improving' | 'stagnating' | 'declining';
   dataPoints: number;
   movingAverages: { date: string; value: number }[];
+  volumeMovingAverages: { date: string; value: number }[];
 }
 
 export interface RollingVolumeResult {
@@ -89,6 +104,9 @@ export interface MetricDelta {
   reps: number;
   estimated1RM: number;
   volumeLoad: number;
+  totalReps: number;
+  avgReps: number;
+  minReps: number;
 }
 
 export interface SessionComparisonPoint {
@@ -97,6 +115,11 @@ export interface SessionComparisonPoint {
   reps: number;
   estimated1RM: number;
   volumeLoad: number;
+  totalReps: number;
+  avgReps: number;
+  minReps: number;
+  workingSets: number;
+  sets: SessionSetSnapshot[];
   vsPrevious: MetricDelta | null;
 }
 

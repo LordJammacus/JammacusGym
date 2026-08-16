@@ -18,6 +18,8 @@ export const chartColors = {
   zinc: '#71717a',
 };
 
+export const setChartColors = ['#6366f1', '#06b6d4', '#22c55e', '#f59e0b', '#a855f7', '#71717a', '#f43f5e'];
+
 export const chartTooltipStyle = {
   backgroundColor: '#18181b',
   border: '1px solid #3f3f46',

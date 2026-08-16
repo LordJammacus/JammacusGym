@@ -32,7 +32,7 @@ export const performanceRecommender: RecommendationSource = {
         type: 'exercise',
         priority: severity,
         title: `${stag.exerciseName} has stagnated`,
-        reasoning: `No improvement in estimated 1RM over the last ${sessions} sessions${stag.lastProgressDate ? ` (since ${stag.lastProgressDate})` : ''}.`,
+        reasoning: `No improvement in load, reps, or volume over the last ${sessions} sessions${stag.lastProgressDate ? ` (since ${stag.lastProgressDate})` : ''}.`,
         suggestedAction: suggestion,
         confidence: sessions >= 8 ? 0.8 : 0.65,
         supportingData: {
