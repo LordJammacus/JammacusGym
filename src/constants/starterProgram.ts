@@ -62,7 +62,7 @@ const TEMPLATES: TemplateSpec[] = [
     id: 'tmpl-push-hypertrophy',
     name: 'Push (Hypertrophy)',
     goal: 'hypertrophy',
-    estimatedDurationMinutes: 55,
+    estimatedDurationMinutes: 65,
     notes: 'Leave 1–2 reps in reserve on working sets. Longer last-set stretch on laterals/dips is fine.',
     exercises: [
       {
@@ -74,6 +74,12 @@ const TEMPLATES: TemplateSpec[] = [
       {
         exerciseId: 'ex-db-incline-bench',
         restSeconds: 120,
+        sets: nWork(3, 8, 12),
+      },
+      {
+        exerciseId: 'ex-db-shoulder-press',
+        restSeconds: 120,
+        notes: 'Seated or standing. Control the bottom; no bounce. Shoulders are already warm from incline.',
         sets: nWork(3, 8, 12),
       },
       {
@@ -154,7 +160,7 @@ const TEMPLATES: TemplateSpec[] = [
     id: 'tmpl-push-strength',
     name: 'Push (Strength)',
     goal: 'strength',
-    estimatedDurationMinutes: 50,
+    estimatedDurationMinutes: 60,
     notes: 'Heavier loads, longer rests. Hit the low end of the rep range with solid form.',
     exercises: [
       {
@@ -166,6 +172,12 @@ const TEMPLATES: TemplateSpec[] = [
       {
         exerciseId: 'ex-db-incline-bench',
         restSeconds: 150,
+        sets: nWork(3, 5, 8, 1),
+      },
+      {
+        exerciseId: 'ex-db-shoulder-press',
+        restSeconds: 150,
+        notes: 'Same 3 hard sets as hypertrophy, heavier. Stop one shy of a grind.',
         sets: nWork(3, 5, 8, 1),
       },
       {
@@ -239,7 +251,7 @@ const TEMPLATES: TemplateSpec[] = [
     id: 'tmpl-push-deload',
     name: 'Push (Deload)',
     goal: 'recovery',
-    estimatedDurationMinutes: 35,
+    estimatedDurationMinutes: 40,
     notes: 'About half the usual hard sets. Stop well short of failure (~3–4 RIR).',
     exercises: [
       {
@@ -250,6 +262,12 @@ const TEMPLATES: TemplateSpec[] = [
       {
         exerciseId: 'ex-db-incline-bench',
         restSeconds: 90,
+        sets: nWork(2, 8, 10, 4),
+      },
+      {
+        exerciseId: 'ex-db-shoulder-press',
+        restSeconds: 90,
+        notes: 'Keep the groove; stay well short of failure.',
         sets: nWork(2, 8, 10, 4),
       },
       {
