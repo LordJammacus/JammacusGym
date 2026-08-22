@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Card, Input, Modal } from '@/components/ui';
-import type { WorkoutTemplate, TemplateExercise, SetTarget, Exercise } from '@/types/entities';
+import { Button, Card, Modal } from '@/components/ui';
+import { ExercisePickerModal } from '@/components/workout/ExercisePickerModal';
+import type { WorkoutTemplate, TemplateExercise, SetTarget } from '@/types/entities';
 import type { SetType } from '@/types/enums';
 import * as workoutsRepo from '@/db/repositories/workouts';
 import * as exercisesRepo from '@/db/repositories/exercises';
@@ -141,10 +142,11 @@ export function TemplateEditorPage() {
         + Add Exercise
       </Button>
 
-      <AddExerciseModal
+      <ExercisePickerModal
         open={showAddExercise}
         onClose={() => setShowAddExercise(false)}
-        onAdd={async (exerciseId) => {
+        title="Add Exercise"
+        onSelect={async (exerciseId) => {
           const exercise = await exercisesRepo.getExercise(exerciseId);
           if (!exercise) return;
           const te: TemplateExercise = {
@@ -185,50 +187,6 @@ export function TemplateEditorPage() {
         onSave={load}
       />
     </div>
-  );
-}
-
-function AddExerciseModal({
-  open,
-  onClose,
-  onAdd,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onAdd: (exerciseId: string) => void;
-}) {
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState<Exercise[]>([]);
-
-  useEffect(() => {
-    if (!open) return;
-    const loadResults = async () => {
-      const r = search
-        ? await exercisesRepo.searchExercises(search)
-        : await exercisesRepo.getActiveExercises();
-      setResults(r);
-    };
-    loadResults();
-  }, [search, open]);
-
-  return (
-    <Modal open={open} onClose={onClose} title="Add Exercise">
-      <div className="space-y-3">
-        <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
-        <div className="max-h-64 overflow-y-auto space-y-1">
-          {results.map(ex => (
-            <button
-              key={ex.id}
-              className="w-full text-left p-3 rounded-lg active:bg-surface-overlay transition-colors"
-              onClick={() => { onAdd(ex.id); setSearch(''); }}
-            >
-              <div className="font-medium">{ex.name}</div>
-              <div className="text-xs text-zinc-400 capitalize">{ex.equipment} · {ex.category}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </Modal>
   );
 }
 

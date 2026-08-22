@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Card, Modal } from '@/components/ui';
 import { RestTimer } from '@/components/workout/RestTimer';
+import { ExercisePickerModal } from '@/components/workout/ExercisePickerModal';
 import type { SetTarget, WorkoutInstance, WorkoutExerciseInstance, CompletedSet, ProgressionRule, Note } from '@/types/entities';
 import type { PersonalRecord } from '@/types/analytics';
 import type { ProgressionResult } from '@/engines/progression/types';
@@ -193,6 +194,8 @@ export function ActiveWorkoutPage() {
     dismissRestTimer,
     adjustRestTimer,
     substituteExercise,
+    addExercise,
+    reorderExercises,
     newPRs,
     dismissPRs,
   } = useWorkoutStore();
@@ -210,6 +213,7 @@ export function ActiveWorkoutPage() {
   const [exerciseNotes, setExerciseNotes] = useState<Map<string, Note[]>>(new Map());
   const [postNote, setPostNote] = useState('');
   const [showSubstitute, setShowSubstitute] = useState(false);
+  const [showAddExercise, setShowAddExercise] = useState(false);
   const [setFlash, setSetFlash] = useState(false);
   const [units, setUnits] = useState<WeightUnit>('kg');
   const [weightIncrement, setWeightIncrement] = useState(2.5);
@@ -508,6 +512,14 @@ export function ActiveWorkoutPage() {
             </div>
           );
         })}
+        <button
+          type="button"
+          aria-label="Add exercise"
+          onClick={() => setShowAddExercise(true)}
+          className="px-3 py-1.5 text-xs whitespace-nowrap rounded-full bg-surface-overlay text-zinc-400"
+        >
+          + Add
+        </button>
       </div>
 
       {/* Main content */}
@@ -532,6 +544,26 @@ export function ActiveWorkoutPage() {
           >
             Substitute exercise
           </button>
+          <div className="flex justify-center gap-1 mt-1">
+            <button
+              type="button"
+              aria-label="Move exercise earlier"
+              disabled={currentExerciseIndex === 0}
+              onClick={() => reorderExercises(currentExerciseIndex, currentExerciseIndex - 1)}
+              className="px-3 py-1 text-xs text-zinc-400 disabled:opacity-30"
+            >
+              ↑ Move up
+            </button>
+            <button
+              type="button"
+              aria-label="Move exercise later"
+              disabled={currentExerciseIndex === exerciseInstances.length - 1}
+              onClick={() => reorderExercises(currentExerciseIndex, currentExerciseIndex + 1)}
+              className="px-3 py-1 text-xs text-zinc-400 disabled:opacity-30"
+            >
+              ↓ Move down
+            </button>
+          </div>
         </div>
 
         {/* Progression reasoning */}
@@ -761,16 +793,27 @@ export function ActiveWorkoutPage() {
       </Modal>
 
       {/* Substitute exercise modal */}
-      <SubstituteModal
+      <ExercisePickerModal
         open={showSubstitute}
         onClose={() => setShowSubstitute(false)}
-        onSubstitute={async (newExerciseId) => {
+        title="Substitute Exercise"
+        onSelect={async (newExerciseId) => {
           await substituteExercise(currentExerciseIndex, newExerciseId);
           const ex = await exercisesRepo.getExercise(newExerciseId);
           if (ex) {
             setExerciseNames(prev => new Map(prev).set(newExerciseId, ex.name));
           }
           setShowSubstitute(false);
+        }}
+      />
+
+      <ExercisePickerModal
+        open={showAddExercise}
+        onClose={() => setShowAddExercise(false)}
+        title="Add Exercise"
+        onSelect={async (exerciseId) => {
+          await addExercise(exerciseId);
+          setShowAddExercise(false);
         }}
       />
     </div>
@@ -810,52 +853,3 @@ function deduplicatePRsForDisplay(prs: PersonalRecord[]): PersonalRecord[] {
   return Array.from(seen.values());
 }
 
-function SubstituteModal({
-  open,
-  onClose,
-  onSubstitute,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSubstitute: (exerciseId: string) => void;
-}) {
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState<Array<{ id: string; name: string; equipment: string; category: string }>>([]);
-
-  useEffect(() => {
-    if (!open) return;
-    const load = async () => {
-      const r = search
-        ? await exercisesRepo.searchExercises(search)
-        : await exercisesRepo.getActiveExercises();
-      setResults(r.slice(0, 30));
-    };
-    load();
-  }, [search, open]);
-
-  return (
-    <Modal open={open} onClose={onClose} title="Substitute Exercise">
-      <div className="space-y-3">
-        <input
-          type="text"
-          placeholder="Search exercises..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full bg-surface-overlay rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500"
-        />
-        <div className="max-h-64 overflow-y-auto space-y-1">
-          {results.map(ex => (
-            <button
-              key={ex.id}
-              className="w-full text-left p-3 rounded-lg active:bg-surface-overlay transition-colors"
-              onClick={() => onSubstitute(ex.id)}
-            >
-              <div className="font-medium text-sm">{ex.name}</div>
-              <div className="text-xs text-zinc-400 capitalize">{ex.equipment} · {ex.category}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </Modal>
-  );
-}

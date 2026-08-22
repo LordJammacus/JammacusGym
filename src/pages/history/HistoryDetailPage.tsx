@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Card, Input } from '@/components/ui';
+import { ExercisePickerModal } from '@/components/workout/ExercisePickerModal';
 import * as instancesRepo from '@/db/repositories/instances';
 import * as exercisesRepo from '@/db/repositories/exercises';
 import { getSettings } from '@/db/database';
@@ -8,6 +9,7 @@ import { generateId } from '@/utils/ids';
 import { formatVolume, formatWeight } from '@/utils/units';
 import { countRemainingPlannedSets, getResumeCta, historyStatusLabel } from '@/utils/workoutResume';
 import { ResumeConflictModal, useResumeWorkout } from '@/hooks/useResumeWorkout';
+import { useWorkoutStore } from '@/stores/workoutStore';
 import type { WorkoutInstance, WorkoutExerciseInstance, CompletedSet, SetTarget } from '@/types/entities';
 import type { WeightUnit } from '@/types/enums';
 
@@ -34,6 +36,7 @@ export function HistoryDetailPage() {
   const [drafts, setDrafts] = useState<Record<string, SetDraft[]>>({});
   const [saving, setSaving] = useState(false);
   const [setTargets, setSetTargets] = useState<SetTarget[][]>([]);
+  const [showAddExercise, setShowAddExercise] = useState(false);
   const { resume, busyId, conflict, dismissConflict } = useResumeWorkout();
 
   const load = useCallback(async () => {
@@ -169,6 +172,37 @@ export function HistoryDetailPage() {
     }
   };
 
+  const handleAddExercise = async (exerciseId: string) => {
+    if (!instance) return;
+    const live = useWorkoutStore.getState();
+    if (live.instance?.id === instance.id) {
+      await live.addExercise(exerciseId);
+    } else {
+      await instancesRepo.addExerciseToWorkout(instance.id, exerciseId);
+    }
+    setShowAddExercise(false);
+    await load();
+  };
+
+  const handleReorder = async (fromIndex: number, toIndex: number) => {
+    if (!instance) return;
+    if (toIndex < 0 || toIndex >= exercises.length) return;
+    const live = useWorkoutStore.getState();
+    if (live.instance?.id === instance.id) {
+      await live.reorderExercises(fromIndex, toIndex);
+    } else {
+      const ordered = [...exercises];
+      const [moved] = ordered.splice(fromIndex, 1);
+      if (!moved) return;
+      ordered.splice(toIndex, 0, moved);
+      await instancesRepo.reorderExerciseInstances(
+        instance.id,
+        ordered.map(ex => ex.exerciseInstance.id),
+      );
+    }
+    await load();
+  };
+
   if (loading || !instance) return <div className="p-4 text-zinc-400">Loading...</div>;
 
   const formatDate = (iso: string) => {
@@ -260,11 +294,33 @@ export function HistoryDetailPage() {
       </div>
 
       <div className="space-y-3">
-        {exercises.map(({ exerciseInstance, name, sets }) => {
+        {exercises.map(({ exerciseInstance, name, sets }, idx) => {
           const draftSets = drafts[exerciseInstance.id] ?? [];
           return (
             <Card key={exerciseInstance.id}>
-              <h3 className="font-semibold mb-2">{name}</h3>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h3 className="font-semibold">{name}</h3>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    aria-label={`Move ${name} up`}
+                    onClick={() => handleReorder(idx, idx - 1)}
+                    className="p-2 text-zinc-400 active:text-white disabled:opacity-30"
+                    disabled={idx === 0}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Move ${name} down`}
+                    onClick={() => handleReorder(idx, idx + 1)}
+                    className="p-2 text-zinc-400 active:text-white disabled:opacity-30"
+                    disabled={idx === exercises.length - 1}
+                  >
+                    ↓
+                  </button>
+                </div>
+              </div>
               {editing ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 text-xs text-zinc-500">
@@ -337,6 +393,17 @@ export function HistoryDetailPage() {
           );
         })}
       </div>
+
+      <Button variant="secondary" className="w-full" onClick={() => setShowAddExercise(true)}>
+        + Add Exercise
+      </Button>
+
+      <ExercisePickerModal
+        open={showAddExercise}
+        onClose={() => setShowAddExercise(false)}
+        title="Add Exercise"
+        onSelect={handleAddExercise}
+      />
 
       <ResumeConflictModal open={conflict} onClose={dismissConflict} />
     </div>

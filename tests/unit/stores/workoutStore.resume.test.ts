@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '@/db/database';
 import { useWorkoutStore } from '@/stores/workoutStore';
-import type { SetTarget, WorkoutExerciseInstance, WorkoutInstance } from '@/types/entities';
+import * as instancesRepo from '@/db/repositories/instances';
+import type { Exercise, SetTarget, WorkoutExerciseInstance, WorkoutInstance } from '@/types/entities';
 
 function makeInstance(id: string, status: WorkoutInstance['status'] = 'in_progress'): WorkoutInstance {
   const now = '2026-08-16T10:00:00.000Z';
@@ -70,6 +71,7 @@ describe('pause and resume workout', () => {
     await db.workoutExerciseInstances.clear();
     await db.completedSets.clear();
     await db.setTargets.clear();
+    await db.exercises.clear();
   });
 
   it('pauses an in-progress session and restores it from history', async () => {
@@ -141,5 +143,61 @@ describe('pause and resume workout', () => {
     await useWorkoutStore.getState().startWorkout(makeInstance('w1'), makeExercises('w1'), makeTargets());
     const result = await useWorkoutStore.getState().resumeWorkout('w1');
     expect(result).toBe('already_active');
+  });
+
+  it('picks up extra exercises added after finish later', async () => {
+    const instance = makeInstance('w1');
+    await useWorkoutStore.getState().startWorkout(instance, makeExercises('w1'), makeTargets());
+    await useWorkoutStore.getState().completeSet({ weight: 80, reps: 8, rir: null, setType: 'working' });
+    await useWorkoutStore.getState().completeSet({ weight: 80, reps: 8, rir: null, setType: 'working' });
+    await useWorkoutStore.getState().completeSet({ weight: 80, reps: 8, rir: null, setType: 'working' });
+    useWorkoutStore.getState().nextExercise();
+    await useWorkoutStore.getState().completeSet({ weight: 40, reps: 8, rir: null, setType: 'working' });
+    await useWorkoutStore.getState().completeSet({ weight: 40, reps: 8, rir: null, setType: 'working' });
+    await useWorkoutStore.getState().pauseWorkout();
+
+    const now = '2026-08-16T10:00:00.000Z';
+    const curl: Exercise = {
+      id: 'ex-curl',
+      name: 'Curl',
+      category: 'isolation',
+      equipment: 'dumbbell',
+      movementPattern: 'isolation',
+      defaultRepRangeMin: 8,
+      defaultRepRangeMax: 12,
+      defaultRestSeconds: 75,
+      notes: '',
+      isCustom: false,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.exercises.put(curl);
+    await instancesRepo.addExerciseToWorkout('w1', 'ex-curl');
+
+    const result = await useWorkoutStore.getState().resumeWorkout('w1');
+    expect(result).toBe('ok');
+
+    const state = useWorkoutStore.getState();
+    expect(state.exerciseInstances).toHaveLength(3);
+    expect(state.exerciseInstances[2]?.exerciseId).toBe('ex-curl');
+    expect(state.setTargets).toHaveLength(3);
+    expect(state.setTargets[2]).toHaveLength(3);
+    expect(state.currentExerciseIndex).toBe(2);
+    expect(state.currentSetIndex).toBe(0);
+  });
+
+  it('keeps reordered exercises after pause and resume', async () => {
+    await useWorkoutStore.getState().startWorkout(makeInstance('w1'), makeExercises('w1'), makeTargets());
+    await useWorkoutStore.getState().reorderExercises(0, 1);
+    expect(useWorkoutStore.getState().exerciseInstances.map(e => e.id)).toEqual(['ei-b', 'ei-a']);
+
+    await useWorkoutStore.getState().pauseWorkout();
+    await useWorkoutStore.getState().resumeWorkout('w1');
+
+    const state = useWorkoutStore.getState();
+    expect(state.exerciseInstances.map(e => e.id)).toEqual(['ei-b', 'ei-a']);
+    expect(state.setTargets[0]?.[0]?.targetWeight).toBe(40);
+    expect(state.setTargets[1]?.[0]?.targetWeight).toBe(80);
   });
 });

@@ -50,6 +50,8 @@ interface WorkoutState {
   dismissRestTimer: () => void;
   adjustRestTimer: (deltaSeconds: number) => void;
   substituteExercise: (exerciseIndex: number, newExerciseId: string) => Promise<void>;
+  addExercise: (exerciseId: string) => Promise<void>;
+  reorderExercises: (fromIndex: number, toIndex: number) => Promise<void>;
   newPRs: PersonalRecord[];
   dismissPRs: () => void;
   reset: () => void;
@@ -371,6 +373,73 @@ export const useWorkoutStore = create<WorkoutState>()(
         });
 
         set({ exerciseInstances: updated });
+      },
+
+      addExercise: async (exerciseId) => {
+        const state = get();
+        if (!state.instance) return;
+
+        const { exerciseInstance, setTargets } = await instancesRepo.addExerciseToWorkout(
+          state.instance.id,
+          exerciseId,
+          { sessionSetTargets: state.setTargets },
+        );
+
+        const setsForNew = state.completedSets.filter(
+          s => s.workoutExerciseInstanceId === exerciseInstance.id,
+        );
+
+        set({
+          instance: { ...state.instance, sessionSetTargets: setTargets },
+          exerciseInstances: [...state.exerciseInstances, exerciseInstance],
+          setTargets,
+          progressionResults: [...state.progressionResults, null],
+          currentExerciseIndex: state.exerciseInstances.length,
+          currentSetIndex: setsForNew.length,
+          exerciseStartTime: Date.now(),
+        });
+      },
+
+      reorderExercises: async (fromIndex, toIndex) => {
+        const state = get();
+        if (!state.instance) return;
+        if (fromIndex === toIndex) return;
+        if (fromIndex < 0 || fromIndex >= state.exerciseInstances.length) return;
+        if (toIndex < 0 || toIndex >= state.exerciseInstances.length) return;
+
+        const ordered = [...state.exerciseInstances];
+        const [moved] = ordered.splice(fromIndex, 1);
+        if (!moved) return;
+        ordered.splice(toIndex, 0, moved);
+
+        const currentId = state.exerciseInstances[state.currentExerciseIndex]?.id;
+        const { exerciseInstances, setTargets } = await instancesRepo.reorderExerciseInstances(
+          state.instance.id,
+          ordered.map(ei => ei.id),
+          { sessionSetTargets: state.setTargets },
+        );
+
+        const progressionResults = exerciseInstances.map(ei => {
+          const oldIdx = state.exerciseInstances.findIndex(prev => prev.id === ei.id);
+          return oldIdx >= 0 ? (state.progressionResults[oldIdx] ?? null) : null;
+        });
+
+        const currentExerciseIndex = currentId
+          ? Math.max(0, exerciseInstances.findIndex(ei => ei.id === currentId))
+          : 0;
+        const currentEi = exerciseInstances[currentExerciseIndex];
+        const currentSetIndex = currentEi
+          ? state.completedSets.filter(s => s.workoutExerciseInstanceId === currentEi.id).length
+          : 0;
+
+        set({
+          instance: { ...state.instance, sessionSetTargets: setTargets },
+          exerciseInstances,
+          setTargets,
+          progressionResults,
+          currentExerciseIndex,
+          currentSetIndex,
+        });
       },
 
       reset: () => set(initialState),
