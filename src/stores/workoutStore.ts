@@ -52,6 +52,7 @@ interface WorkoutState {
   substituteExercise: (exerciseIndex: number, newExerciseId: string) => Promise<void>;
   addExercise: (exerciseId: string) => Promise<void>;
   reorderExercises: (fromIndex: number, toIndex: number) => Promise<void>;
+  removeExercise: (exerciseIndex: number) => Promise<void>;
   newPRs: PersonalRecord[];
   dismissPRs: () => void;
   reset: () => void;
@@ -439,6 +440,53 @@ export const useWorkoutStore = create<WorkoutState>()(
           progressionResults,
           currentExerciseIndex,
           currentSetIndex,
+        });
+      },
+
+      removeExercise: async (exerciseIndex) => {
+        const state = get();
+        if (!state.instance) return;
+        if (state.exerciseInstances.length <= 1) return;
+        const target = state.exerciseInstances[exerciseIndex];
+        if (!target) return;
+
+        const { exerciseInstances, setTargets } = await instancesRepo.removeExerciseFromWorkout(
+          state.instance.id,
+          target.id,
+          { sessionSetTargets: state.setTargets },
+        );
+
+        const completedSets = state.completedSets.filter(
+          s => s.workoutExerciseInstanceId !== target.id,
+        );
+        const progressionResults = exerciseInstances.map(ei => {
+          const oldIdx = state.exerciseInstances.findIndex(prev => prev.id === ei.id);
+          return oldIdx >= 0 ? (state.progressionResults[oldIdx] ?? null) : null;
+        });
+
+        let currentExerciseIndex = state.currentExerciseIndex;
+        if (exerciseIndex < currentExerciseIndex) {
+          currentExerciseIndex -= 1;
+        } else if (exerciseIndex === currentExerciseIndex) {
+          currentExerciseIndex = Math.min(exerciseIndex, exerciseInstances.length - 1);
+        }
+        currentExerciseIndex = Math.max(0, currentExerciseIndex);
+
+        const currentEi = exerciseInstances[currentExerciseIndex];
+        const currentSetIndex = currentEi
+          ? completedSets.filter(s => s.workoutExerciseInstanceId === currentEi.id).length
+          : 0;
+
+        set({
+          instance: { ...state.instance, sessionSetTargets: setTargets },
+          exerciseInstances,
+          setTargets,
+          completedSets,
+          progressionResults,
+          currentExerciseIndex,
+          currentSetIndex,
+          restTimerTarget: exerciseIndex === state.currentExerciseIndex ? null : state.restTimerTarget,
+          exerciseStartTime: Date.now(),
         });
       },
 

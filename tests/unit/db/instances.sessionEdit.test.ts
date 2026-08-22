@@ -128,4 +128,41 @@ describe('session exercise edits', () => {
     const stored = await db.workoutInstances.get('w1');
     expect(stored?.sessionSetTargets?.[0]?.[0]?.id).toBe('t2');
   });
+
+  it('removes an exercise, its sets, and keeps remaining targets aligned', async () => {
+    const instance = { ...makeInstance('w1'), sessionSetTargets: makeTargets() };
+    await db.workoutInstances.put(instance);
+    await db.workoutExerciseInstances.bulkPut(makeExercises('w1'));
+    await db.completedSets.put({
+      id: 's1',
+      workoutExerciseInstanceId: 'ei-b',
+      orderIndex: 0,
+      setType: 'working',
+      targetWeight: 40,
+      targetRepMin: 8,
+      targetRepMax: 10,
+      targetRir: 2,
+      actualWeight: 40,
+      actualReps: 8,
+      actualRir: null,
+      actualRestSeconds: null,
+      isAdditional: false,
+      completedAt: '2026-08-16T10:00:00.000Z',
+      notes: '',
+    });
+
+    const { exerciseInstances, setTargets } = await instancesRepo.removeExerciseFromWorkout('w1', 'ei-b');
+
+    expect(exerciseInstances.map(e => e.id)).toEqual(['ei-a']);
+    expect(exerciseInstances[0]?.orderIndex).toBe(0);
+    expect(setTargets).toHaveLength(1);
+    expect(setTargets[0]?.[0]?.id).toBe('t1');
+
+    const storedEis = await instancesRepo.getExerciseInstances('w1');
+    expect(storedEis.map(e => e.id)).toEqual(['ei-a']);
+    expect(await db.completedSets.get('s1')).toBeUndefined();
+    await expect(instancesRepo.removeExerciseFromWorkout('w1', 'ei-a')).rejects.toThrow(
+      'Cannot remove the last exercise',
+    );
+  });
 });

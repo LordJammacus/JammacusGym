@@ -196,6 +196,7 @@ export function ActiveWorkoutPage() {
     substituteExercise,
     addExercise,
     reorderExercises,
+    removeExercise,
     newPRs,
     dismissPRs,
   } = useWorkoutStore();
@@ -562,6 +563,15 @@ export function ActiveWorkoutPage() {
               className="px-3 py-1 text-xs text-zinc-400 disabled:opacity-30"
             >
               ↓ Move down
+            </button>
+            <button
+              type="button"
+              aria-label="Remove exercise"
+              disabled={exerciseInstances.length <= 1}
+              onClick={() => removeExercise(currentExerciseIndex)}
+              className="px-3 py-1 text-xs text-red-400 disabled:opacity-30"
+            >
+              Remove
             </button>
           </div>
         </div>

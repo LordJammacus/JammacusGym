@@ -184,6 +184,46 @@ export async function reorderExerciseInstances(
   return { exerciseInstances, setTargets };
 }
 
+export async function removeExerciseFromWorkout(
+  workoutInstanceId: string,
+  exerciseInstanceId: string,
+  options?: { sessionSetTargets?: SetTarget[][] },
+): Promise<{ exerciseInstances: WorkoutExerciseInstance[]; setTargets: SetTarget[][] }> {
+  const instance = await getWorkoutInstance(workoutInstanceId);
+  if (!instance) {
+    throw new Error('Workout not found');
+  }
+
+  const existing = await getExerciseInstances(workoutInstanceId);
+  if (existing.length <= 1) {
+    throw new Error('Cannot remove the last exercise');
+  }
+
+  const remaining = existing.filter(ei => ei.id !== exerciseInstanceId);
+  if (remaining.length === existing.length) {
+    throw new Error('Exercise not found');
+  }
+
+  const currentTargets = await resolveTargetsForEdit(instance, existing, options?.sessionSetTargets);
+  const setTargets = alignTargetsToOrder(
+    remaining.map(ei => ei.id),
+    existing.map(ei => ei.id),
+    currentTargets,
+  );
+  const exerciseInstances = remaining.map((ei, orderIndex) => ({ ...ei, orderIndex }));
+
+  await db.transaction('rw', [db.workoutExerciseInstances, db.workoutInstances, db.completedSets], async () => {
+    await db.completedSets.where('workoutExerciseInstanceId').equals(exerciseInstanceId).delete();
+    await db.workoutExerciseInstances.delete(exerciseInstanceId);
+    for (const ei of exerciseInstances) {
+      await db.workoutExerciseInstances.update(ei.id, { orderIndex: ei.orderIndex });
+    }
+    await db.workoutInstances.update(workoutInstanceId, { sessionSetTargets: setTargets });
+  });
+
+  return { exerciseInstances, setTargets };
+}
+
 export async function addCompletedSet(set: CompletedSet): Promise<void> {
   await db.completedSets.put(set);
 }

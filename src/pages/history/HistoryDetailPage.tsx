@@ -203,6 +203,25 @@ export function HistoryDetailPage() {
     await load();
   };
 
+  const handleRemove = async (index: number) => {
+    if (!instance) return;
+    if (exercises.length <= 1) return;
+    const target = exercises[index];
+    if (!target) return;
+    const live = useWorkoutStore.getState();
+    if (live.instance?.id === instance.id) {
+      await live.removeExercise(index);
+    } else {
+      await instancesRepo.removeExerciseFromWorkout(instance.id, target.exerciseInstance.id);
+    }
+    setDrafts(prev => {
+      const next = { ...prev };
+      delete next[target.exerciseInstance.id];
+      return next;
+    });
+    await load();
+  };
+
   if (loading || !instance) return <div className="p-4 text-zinc-400">Loading...</div>;
 
   const formatDate = (iso: string) => {
@@ -318,6 +337,15 @@ export function HistoryDetailPage() {
                     disabled={idx === exercises.length - 1}
                   >
                     ↓
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${name}`}
+                    onClick={() => handleRemove(idx)}
+                    className="p-2 text-red-400 active:text-red-300 disabled:opacity-30"
+                    disabled={exercises.length <= 1}
+                  >
+                    ×
                   </button>
                 </div>
               </div>

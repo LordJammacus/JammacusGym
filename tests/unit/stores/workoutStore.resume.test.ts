@@ -200,4 +200,18 @@ describe('pause and resume workout', () => {
     expect(state.setTargets[0]?.[0]?.targetWeight).toBe(40);
     expect(state.setTargets[1]?.[0]?.targetWeight).toBe(80);
   });
+
+  it('does not show a removed exercise after finish later', async () => {
+    await useWorkoutStore.getState().startWorkout(makeInstance('w1'), makeExercises('w1'), makeTargets());
+    await useWorkoutStore.getState().completeSet({ weight: 80, reps: 8, rir: null, setType: 'working' });
+    await useWorkoutStore.getState().removeExercise(0);
+    await useWorkoutStore.getState().pauseWorkout();
+    await useWorkoutStore.getState().resumeWorkout('w1');
+
+    const state = useWorkoutStore.getState();
+    expect(state.exerciseInstances.map(e => e.id)).toEqual(['ei-b']);
+    expect(state.setTargets).toHaveLength(1);
+    expect(state.setTargets[0]?.[0]?.targetWeight).toBe(40);
+    expect(state.completedSets).toHaveLength(0);
+  });
 });
