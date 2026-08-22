@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { buildStarterProgramData, STARTER_PROGRAM_ID } from '@/constants/starterProgram';
 import { EXERCISES } from '@/constants/exercises';
 import { db } from '@/db/database';
-import { patchStarterPushShoulderPress } from '@/db/seed';
+import { patchStarterPushDipsToKickbacks, patchStarterPushShoulderPress } from '@/db/seed';
 import type { Program, TemplateExercise, WorkoutTemplate } from '@/types/entities';
 
 describe('starter home PPL program', () => {
@@ -36,12 +36,17 @@ describe('starter home PPL program', () => {
       'ex-db-incline-bench',
       'ex-db-shoulder-press',
       'ex-lateral-raise',
-      'ex-dips',
+      'ex-kickback',
     ]);
 
     const pressTe = tes.find(te => te.exerciseId === 'ex-db-shoulder-press')!;
     const pressSets = data.setTargets.filter(s => s.templateExerciseId === pressTe.id);
     expect(pressSets.filter(s => s.setType === 'working')).toHaveLength(3);
+
+    const kickbackTe = tes.find(te => te.exerciseId === 'ex-kickback')!;
+    const kickbackSets = data.setTargets.filter(s => s.templateExerciseId === kickbackTe.id);
+    expect(kickbackSets).toHaveLength(3);
+    expect(kickbackSets.every(s => s.setType === 'working' && s.targetRepMin === 10 && s.targetRepMax === 15)).toBe(true);
 
     const benchSets = data.setTargets
       .filter(s => s.templateExerciseId === tes[0]!.id)
@@ -133,5 +138,73 @@ describe('patchStarterPushShoulderPress', () => {
     const sets = await db.setTargets.where('templateExerciseId').equals(press.id).sortBy('orderIndex');
     expect(sets).toHaveLength(3);
     expect(sets.every(s => s.setType === 'working' && s.targetRepMin === 8 && s.targetRepMax === 12)).toBe(true);
+  });
+});
+
+describe('patchStarterPushDipsToKickbacks', () => {
+  beforeEach(async () => {
+    await db.programs.clear();
+    await db.workoutTemplates.clear();
+    await db.templateExercises.clear();
+    await db.setTargets.clear();
+    await db.exercises.clear();
+    await db.exerciseMuscles.clear();
+  });
+
+  it('swaps dips for kickbacks on existing starter push templates', async () => {
+    const now = '2026-08-16T00:00:00.000Z';
+    const program: Program = {
+      id: STARTER_PROGRAM_ID,
+      name: 'Home PPL (DB / Bar)',
+      description: '',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
+    };
+    const template: WorkoutTemplate = {
+      id: 'tmpl-push-hypertrophy',
+      name: 'Push (Hypertrophy)',
+      goal: 'hypertrophy',
+      estimatedDurationMinutes: 65,
+      notes: '',
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
+    };
+    const dip: TemplateExercise = {
+      id: 'te-dips',
+      workoutTemplateId: template.id,
+      exerciseId: 'ex-dips',
+      orderIndex: 4,
+      supersetGroup: null,
+      restSeconds: 90,
+      notes: 'Slight forward lean for chest+tris.',
+      progressionRuleId: null,
+    };
+
+    await db.programs.put(program);
+    await db.workoutTemplates.put(template);
+    await db.templateExercises.put(dip);
+    await db.setTargets.bulkPut([
+      { id: 's0', templateExerciseId: dip.id, orderIndex: 0, setType: 'working', targetWeight: null, targetRepMin: 8, targetRepMax: 12, targetRir: 2 },
+      { id: 's1', templateExerciseId: dip.id, orderIndex: 1, setType: 'working', targetWeight: null, targetRepMin: 8, targetRepMax: 12, targetRir: 2 },
+      { id: 's2', templateExerciseId: dip.id, orderIndex: 2, setType: 'working', targetWeight: null, targetRepMin: 8, targetRepMax: 12, targetRir: 2 },
+    ]);
+
+    await patchStarterPushDipsToKickbacks();
+    await patchStarterPushDipsToKickbacks();
+
+    const tes = await db.templateExercises.where('workoutTemplateId').equals(template.id).toArray();
+    expect(tes).toHaveLength(1);
+    expect(tes[0]!.exerciseId).toBe('ex-kickback');
+    expect(tes[0]!.restSeconds).toBe(60);
+
+    const sets = await db.setTargets.where('templateExerciseId').equals(dip.id).sortBy('orderIndex');
+    expect(sets).toHaveLength(3);
+    expect(sets.every(s => s.targetRepMin === 10 && s.targetRepMax === 15 && s.targetRir === 1)).toBe(true);
+
+    const kickback = await db.exercises.get('ex-kickback');
+    expect(kickback?.name).toBe('Tricep Kickback');
   });
 });

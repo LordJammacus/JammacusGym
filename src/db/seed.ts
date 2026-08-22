@@ -8,6 +8,7 @@ export async function seedDatabase(): Promise<void> {
   await seedCatalog();
   await seedStarterProgram();
   await patchStarterPushShoulderPress();
+  await patchStarterPushDipsToKickbacks();
 }
 
 async function seedCatalog(): Promise<void> {
@@ -191,6 +192,113 @@ export async function patchStarterPushShoulderPress(): Promise<void> {
         });
       }
     },
+  );
+}
+
+const PUSH_DIP_TO_KICKBACK_PATCH: Array<{
+  templateId: string;
+  restSeconds: number;
+  notes: string;
+  sets: Array<{ repMin: number; repMax: number; rir: number }>;
+}> = [
+  {
+    templateId: 'tmpl-push-hypertrophy',
+    restSeconds: 60,
+    notes:
+      'Elbow pinned to your side. Full lockout, no swing. Light enough that the last reps still look like kickbacks.',
+    sets: [
+      { repMin: 10, repMax: 15, rir: 1 },
+      { repMin: 10, repMax: 15, rir: 1 },
+      { repMin: 10, repMax: 15, rir: 1 },
+    ],
+  },
+  {
+    templateId: 'tmpl-push-strength',
+    restSeconds: 60,
+    notes: 'Isolation finisher. Strict elbow position; do not chase heavy DBs.',
+    sets: [
+      { repMin: 10, repMax: 15, rir: 2 },
+      { repMin: 10, repMax: 15, rir: 2 },
+      { repMin: 10, repMax: 15, rir: 2 },
+    ],
+  },
+  {
+    templateId: 'tmpl-push-deload',
+    restSeconds: 45,
+    notes: '',
+    sets: [
+      { repMin: 10, repMax: 15, rir: 4 },
+      { repMin: 10, repMax: 15, rir: 4 },
+    ],
+  },
+];
+
+/** Replaces dips with kickbacks on existing starter push templates (idempotent). */
+export async function patchStarterPushDipsToKickbacks(): Promise<void> {
+  const program = await db.programs.get(STARTER_PROGRAM_ID);
+  if (!program) return;
+
+  await ensureCatalogExercise('ex-kickback');
+
+  await db.transaction('rw', [db.templateExercises, db.setTargets, db.workoutTemplates], async () => {
+    for (const spec of PUSH_DIP_TO_KICKBACK_PATCH) {
+      const tes = await db.templateExercises.where('workoutTemplateId').equals(spec.templateId).toArray();
+      const dip = tes.find(te => te.exerciseId === 'ex-dips');
+      if (!dip) continue;
+
+      await db.templateExercises.update(dip.id, {
+        exerciseId: 'ex-kickback',
+        restSeconds: spec.restSeconds,
+        notes: spec.notes,
+      });
+
+      const targets = await db.setTargets.where('templateExerciseId').equals(dip.id).sortBy('orderIndex');
+      const working = targets.filter(t => t.setType === 'working');
+      for (let i = 0; i < working.length; i++) {
+        const setSpec = spec.sets[Math.min(i, spec.sets.length - 1)]!;
+        await db.setTargets.update(working[i]!.id, {
+          targetRepMin: setSpec.repMin,
+          targetRepMax: setSpec.repMax,
+          targetRir: setSpec.rir,
+        });
+      }
+
+      await db.workoutTemplates.update(spec.templateId, { updatedAt: new Date().toISOString() });
+    }
+  });
+}
+
+async function ensureCatalogExercise(exerciseId: string): Promise<void> {
+  const existing = await db.exercises.get(exerciseId);
+  if (existing) return;
+
+  const seed = EXERCISES.find(e => e.id === exerciseId);
+  if (!seed) return;
+
+  const now = new Date().toISOString();
+  await db.exercises.put({
+    id: seed.id,
+    name: seed.name,
+    category: seed.category,
+    equipment: seed.equipment,
+    movementPattern: seed.movementPattern,
+    defaultRepRangeMin: seed.defaultRepRangeMin,
+    defaultRepRangeMax: seed.defaultRepRangeMax,
+    defaultRestSeconds: seed.defaultRestSeconds,
+    notes: '',
+    isCustom: false,
+    archivedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.exerciseMuscles.bulkPut(
+    seed.muscles.map(muscle => ({
+      id: `em-${seed.id}-${muscle.muscleGroupId}`,
+      exerciseId: seed.id,
+      muscleGroupId: muscle.muscleGroupId,
+      role: muscle.role,
+      contribution: muscle.contribution,
+    })),
   );
 }
 
