@@ -1,8 +1,13 @@
 type AudioContextCtor = typeof AudioContext;
 
+interface AudioSessionLike {
+  type: string;
+}
+
 let audioCtx: AudioContext | null = null;
 let chimeEl: HTMLAudioElement | null = null;
 let chimeUrl: string | null = null;
+let chimeToken = 0;
 
 function getAudioContextCtor(): AudioContextCtor | undefined {
   if (typeof window === 'undefined') return undefined;
@@ -10,10 +15,29 @@ function getAudioContextCtor(): AudioContextCtor | undefined {
     ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext;
 }
 
+function audioSession(): AudioSessionLike | null {
+  if (typeof navigator === 'undefined') return null;
+  const session = (navigator as Navigator & { audioSession?: AudioSessionLike }).audioSession;
+  return session ?? null;
+}
+
+/** Mix with other apps. A playback session pauses music; ambient does not. */
+export function setAmbientAudioSession(): boolean {
+  const session = audioSession();
+  if (!session) return false;
+  try {
+    session.type = 'ambient';
+    return session.type === 'ambient';
+  } catch {
+    return false;
+  }
+}
+
 function getContext(): AudioContext | null {
   const Ctor = getAudioContextCtor();
   if (!Ctor) return null;
   if (!audioCtx || audioCtx.state === 'closed') {
+    setAmbientAudioSession();
     try {
       audioCtx = new Ctor();
     } catch {
@@ -66,7 +90,7 @@ function createChimeWavUrl(): string {
       let env = 1;
       if (local < attack) env = local / attack;
       else if (local > note.duration - release) env = Math.max(0, (note.duration - local) / release);
-      sample += Math.sin(2 * Math.PI * note.freq * local) * env * 0.45;
+      sample += Math.sin(2 * Math.PI * note.freq * local) * env * 0.55;
     }
     const clipped = Math.max(-1, Math.min(1, sample));
     view.setInt16(44 + i * 2, clipped * 32767, true);
@@ -100,8 +124,36 @@ function playSilentBuffer(ctx: AudioContext) {
   source.start(0);
 }
 
+function primeHtmlChime() {
+  // Media elements default to a playback session and pause other apps.
+  // Only prime one after the session is pinned to ambient.
+  if (!setAmbientAudioSession()) return;
+  const el = getChimeElement();
+  if (!el) return;
+  const token = ++chimeToken;
+  el.volume = 0.001;
+  try {
+    el.currentTime = 0;
+  } catch {
+    // Element not seekable yet
+  }
+  const playPromise = el.play();
+  if (!playPromise) return;
+  void playPromise
+    .then(() => {
+      if (token !== chimeToken) return;
+      el.pause();
+      el.currentTime = 0;
+      el.volume = 1;
+    })
+    .catch(() => {
+      if (token === chimeToken) el.volume = 1;
+    });
+}
+
 /** Call from a user gesture (e.g. logging a set) so later rest-complete playback is allowed. */
 export function unlockAudio(): void {
+  setAmbientAudioSession();
   const ctx = getContext();
   if (ctx) {
     if (ctx.state === 'suspended') {
@@ -113,23 +165,7 @@ export function unlockAudio(): void {
       // Unlock not supported
     }
   }
-
-  const el = getChimeElement();
-  if (!el) return;
-  el.volume = 0.001;
-  el.currentTime = 0;
-  const playPromise = el.play();
-  if (playPromise) {
-    void playPromise
-      .then(() => {
-        el.pause();
-        el.currentTime = 0;
-        el.volume = 1;
-      })
-      .catch(() => {
-        el.volume = 1;
-      });
-  }
+  primeHtmlChime();
 }
 
 function playTone(
@@ -137,7 +173,7 @@ function playTone(
   frequency: number,
   start: number,
   duration: number,
-  peakGain = 0.35,
+  peakGain = 0.45,
 ) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -157,43 +193,47 @@ function playTone(
 }
 
 function scheduleRestChime(ctx: AudioContext) {
-  const t = ctx.currentTime;
-  playTone(ctx, 880, t, 0.16);
-  playTone(ctx, 1175, t + 0.2, 0.16);
-  playTone(ctx, 1568, t + 0.4, 0.32, 0.4);
+  const start = ctx.currentTime;
+  const cycle = 0.9;
+  for (let i = 0; i < 2; i++) {
+    const t = start + i * cycle;
+    playTone(ctx, 880, t, 0.16);
+    playTone(ctx, 1175, t + 0.2, 0.16);
+    playTone(ctx, 1568, t + 0.4, 0.32, 0.55);
+  }
 }
 
-function playHtmlChime() {
+async function playHtmlChime(): Promise<boolean> {
+  if (!setAmbientAudioSession()) return false;
   const el = getChimeElement();
-  if (!el) return;
+  if (!el) return false;
+  const token = ++chimeToken;
   el.volume = 1;
-  el.currentTime = 0;
-  void el.play().catch(() => undefined);
+  try {
+    el.currentTime = 0;
+    await el.play();
+    return token === chimeToken;
+  } catch {
+    return false;
+  }
 }
 
-export function playRestCompleteChime(): void {
+/** Plays the rest chime without taking exclusive audio focus. Returns false if nothing could start. */
+export async function playRestCompleteChime(): Promise<boolean> {
+  setAmbientAudioSession();
   const ctx = getContext();
-  if (ctx && ctx.state === 'running') {
+  if (ctx) {
     try {
-      scheduleRestChime(ctx);
-      return;
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      if (ctx.state === 'running') {
+        scheduleRestChime(ctx);
+        return true;
+      }
     } catch {
-      // Fall through to HTML audio
+      // Fall through to the mixable media element
     }
   }
-
-  if (ctx?.state === 'suspended') {
-    void ctx.resume()
-      .then(() => {
-        if (ctx.state === 'running') {
-          scheduleRestChime(ctx);
-          return;
-        }
-        playHtmlChime();
-      })
-      .catch(() => playHtmlChime());
-    return;
-  }
-
-  playHtmlChime();
+  return playHtmlChime();
 }

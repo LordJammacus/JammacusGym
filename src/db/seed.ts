@@ -2,11 +2,17 @@ import { db } from './database';
 import { MUSCLE_GROUPS } from '@/constants/muscles';
 import { EXERCISES } from '@/constants/exercises';
 import { STARTER_PROGRAM_ID, buildStarterProgramData } from '@/constants/starterProgram';
+import {
+  UPPER_SPECIALISATION_PROGRAM_ID,
+  buildUpperSpecialisationProgramData,
+} from '@/constants/upperSpecialisationProgram';
 import type { Exercise, ExerciseMuscle, SetTarget, TemplateExercise } from '@/types/entities';
 
 export async function seedDatabase(): Promise<void> {
   await seedCatalog();
+  await ensureMissingCatalogExercises();
   await seedStarterProgram();
+  await seedUpperSpecialisationProgram();
   await patchStarterPushShoulderPress();
   await patchStarterPushDipsToKickbacks();
 }
@@ -56,6 +62,43 @@ async function seedCatalog(): Promise<void> {
   });
 }
 
+/** Insert catalog exercises added after the user's database was first created. */
+export async function ensureMissingCatalogExercises(): Promise<void> {
+  const now = new Date().toISOString();
+  const present = new Set((await db.exercises.toArray()).map(exercise => exercise.id));
+  const missing = EXERCISES.filter(seed => !present.has(seed.id));
+  if (missing.length === 0) return;
+
+  await db.transaction('rw', [db.exercises, db.exerciseMuscles], async () => {
+    for (const seed of missing) {
+      await db.exercises.put({
+        id: seed.id,
+        name: seed.name,
+        category: seed.category,
+        equipment: seed.equipment,
+        movementPattern: seed.movementPattern,
+        defaultRepRangeMin: seed.defaultRepRangeMin,
+        defaultRepRangeMax: seed.defaultRepRangeMax,
+        defaultRestSeconds: seed.defaultRestSeconds,
+        notes: '',
+        isCustom: false,
+        archivedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await db.exerciseMuscles.bulkPut(
+        seed.muscles.map(muscle => ({
+          id: `em-${seed.id}-${muscle.muscleGroupId}`,
+          exerciseId: seed.id,
+          muscleGroupId: muscle.muscleGroupId,
+          role: muscle.role,
+          contribution: muscle.contribution,
+        })),
+      );
+    }
+  });
+}
+
 /** Editable home PPL program for first-time users (and existing DBs that never got it). */
 export async function seedStarterProgram(): Promise<void> {
   const existing = await db.programs.get(STARTER_PROGRAM_ID);
@@ -86,6 +129,36 @@ export async function seedStarterProgram(): Promise<void> {
       await db.programs.put(data.program);
       await db.trainingBlocks.bulkPut(data.blocks);
       await db.blockWorkouts.bulkPut(data.blockWorkouts);
+    },
+  );
+}
+
+/** 4-day upper specialisation. Leaves an existing active program alone. */
+export async function seedUpperSpecialisationProgram(): Promise<void> {
+  const existing = await db.programs.get(UPPER_SPECIALISATION_PROGRAM_ID);
+  if (existing) return;
+
+  const data = buildUpperSpecialisationProgramData();
+
+  await db.transaction(
+    'rw',
+    [
+      db.workoutTemplates,
+      db.templateExercises,
+      db.setTargets,
+      db.programs,
+      db.trainingBlocks,
+      db.blockWorkouts,
+      db.notes,
+    ],
+    async () => {
+      await db.workoutTemplates.bulkPut(data.templates);
+      await db.templateExercises.bulkPut(data.templateExercises);
+      await db.setTargets.bulkPut(data.setTargets);
+      await db.programs.put(data.program);
+      await db.trainingBlocks.bulkPut(data.blocks);
+      await db.blockWorkouts.bulkPut(data.blockWorkouts);
+      await db.notes.bulkPut(data.notes);
     },
   );
 }

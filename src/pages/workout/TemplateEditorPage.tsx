@@ -98,12 +98,21 @@ export function TemplateEditorPage() {
       </div>
 
       <p className="text-sm text-zinc-400 capitalize">{template.goal}</p>
+      {template.notes && (
+        <p className="text-sm text-zinc-400 leading-relaxed">{template.notes}</p>
+      )}
 
       <div className="space-y-3">
-        {exercises.map((te, idx) => (
+        {exercises.map((te, idx) => {
+          const targets = setTargets.get(te.id) ?? [];
+          const working = targets.find(s => s.setType === 'working');
+          const prescription = working
+            ? ` · ${working.targetRepMin}–${working.targetRepMax}${working.targetRir != null ? ` · RIR ${working.targetRir}` : ''}`
+            : '';
+          return (
           <Card key={te.id}>
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   {te.supersetGroup && (
                     <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 border border-purple-800/50">
@@ -112,8 +121,10 @@ export function TemplateEditorPage() {
                   )}
                   <span className="font-medium">{exerciseNames.get(te.exerciseId) ?? 'Unknown'}</span>
                 </div>
-                <div className="text-sm text-zinc-400 mt-1 flex items-center gap-2">
-                  <span>{(setTargets.get(te.id) ?? []).length} sets ·</span>
+                <div className="text-sm text-zinc-400 mt-1 flex items-center gap-2 flex-wrap">
+                  <span>
+                    {targets.length} {targets.length === 1 ? 'set' : 'sets'}{prescription} ·
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -125,6 +136,9 @@ export function TemplateEditorPage() {
                   />
                   <span>s rest</span>
                 </div>
+                {te.notes && (
+                  <p className="text-xs text-zinc-500 mt-2 leading-relaxed">{te.notes}</p>
+                )}
               </div>
               <div className="flex gap-1">
                 <button onClick={() => handleMoveUp(idx)} className="p-2 text-zinc-400 active:text-white" disabled={idx === 0}>↑</button>
@@ -135,7 +149,8 @@ export function TemplateEditorPage() {
               </div>
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       <Button variant="secondary" className="w-full" onClick={() => setShowAddExercise(true)}>

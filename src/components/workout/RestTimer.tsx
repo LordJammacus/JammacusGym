@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { playRestCompleteChime, unlockAudio } from '@/utils/audio';
+import { useState, useEffect } from 'react';
+import { cancelRestAlert, prepareRestAlerts, scheduleRestAlert } from '@/utils/restAlert';
 
 interface RestTimerProps {
   targetSeconds: number;
@@ -20,34 +20,22 @@ export function RestTimer({
     const elapsed = Math.floor((Date.now() - startedAt) / 1000);
     return targetSeconds - elapsed;
   });
-  const [hasAlerted, setHasAlerted] = useState(false);
 
-  const triggerAlert = useCallback(() => {
-    if (hasAlerted) return;
-    setHasAlerted(true);
-
-    if ('vibrate' in navigator) {
-      navigator.vibrate([200, 100, 200]);
-    }
-
-    playRestCompleteChime();
-  }, [hasAlerted]);
+  useEffect(() => {
+    scheduleRestAlert(startedAt + targetSeconds * 1000);
+    return () => cancelRestAlert();
+  }, [startedAt, targetSeconds]);
 
   useEffect(() => {
     const tick = () => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      const r = targetSeconds - elapsed;
-      setRemaining(r);
-
-      if (r <= 0 && !hasAlerted) {
-        triggerAlert();
-      }
+      setRemaining(targetSeconds - elapsed);
     };
 
     tick();
     const timer = setInterval(tick, 100);
     return () => clearInterval(timer);
-  }, [startedAt, targetSeconds, hasAlerted, triggerAlert]);
+  }, [startedAt, targetSeconds]);
 
   const isOvertime = remaining <= 0;
   const displaySeconds = Math.abs(remaining);
@@ -84,7 +72,7 @@ export function RestTimer({
             type="button"
             aria-label={`Subtract ${adjustSeconds} seconds`}
             onClick={() => {
-              unlockAudio();
+              prepareRestAlerts();
               onAdjust(-adjustSeconds);
             }}
             className="min-w-[44px] h-11 px-3 rounded-full bg-surface flex items-center justify-center text-sm font-bold active:bg-surface-overlay"
@@ -95,7 +83,7 @@ export function RestTimer({
             type="button"
             aria-label={`Add ${adjustSeconds} seconds`}
             onClick={() => {
-              unlockAudio();
+              prepareRestAlerts();
               onAdjust(adjustSeconds);
             }}
             className="min-w-[44px] h-11 px-3 rounded-full bg-surface flex items-center justify-center text-sm font-bold active:bg-surface-overlay"

@@ -18,7 +18,7 @@ import { calculateProgression } from '@/engines/progression';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { generateId } from '@/utils/ids';
 import { haptic } from '@/utils/haptics';
-import { unlockAudio } from '@/utils/audio';
+import { prepareRestAlerts } from '@/utils/restAlert';
 import { formatVolume, formatWeight, roundToIncrement } from '@/utils/units';
 
 export function StartWorkoutPage() {
@@ -103,7 +103,7 @@ export function StartWorkoutPage() {
           orderIndex: te.orderIndex,
           supersetGroup: te.supersetGroup,
           restSecondsTarget: te.restSeconds,
-          notes: '',
+          notes: te.notes,
         });
       }
 
@@ -155,7 +155,7 @@ export function StartWorkoutPage() {
           ))}
         </div>
         <Button className="w-full" onClick={() => {
-          unlockAudio();
+          prepareRestAlerts();
           navigate('/workout/active', { replace: true });
         }}>
           Let's Go
@@ -326,7 +326,7 @@ export function ActiveWorkoutPage() {
   }, [currentExerciseIndex, currentSetIdx]);
 
   const handleCompleteSet = useCallback(async () => {
-    unlockAudio();
+    prepareRestAlerts();
     haptic('success');
     setSetFlash(true);
     setTimeout(() => setSetFlash(false), 400);
@@ -538,7 +538,11 @@ export function ActiveWorkoutPage() {
           <p className="text-sm text-zinc-400 mt-1">
             Set {currentSetIdx + 1} of {Math.max(currentTargets.length, currentSetIdx + 1)}
             {currentTarget && ` · ${currentTarget.targetRepMin}-${currentTarget.targetRepMax} reps`}
+            {currentTarget?.targetRir != null && ` · RIR ${currentTarget.targetRir}`}
           </p>
+          {currentExercise.notes && (
+            <p className="text-xs text-zinc-400 mt-2 text-left leading-relaxed">{currentExercise.notes}</p>
+          )}
           <button
             onClick={() => setShowSubstitute(true)}
             className="text-xs text-zinc-500 mt-1 underline"
