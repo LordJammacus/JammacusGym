@@ -15,9 +15,12 @@ import type { SetType, WorkoutGoal, BlockGoal, DayOfWeek } from '@/types/enums';
  * Mon A / Tue B / Thu C / Sat D, with rest on Wed, Fri, and Sun.
  * Working sets only. Warm-ups are mentioned in the session note and are not logged.
  * A 1–2 RIR target is stored as 2. A 0–1 RIR target is stored as 1.
- * "1–2 sets" is stored as 2, with a note to drop a set when recovery or a tendon says so.
+ * Heavy compounds use a wide rep range so a 5 lb dumbbell jump is not the only way to progress.
  * Side plank is two logged sets (left, then right); reps are seconds.
  */
+
+export const UPPER_SPEC_REVISION = '2';
+export const UPPER_SPEC_REVISION_NOTE_ID = 'note-upper-spec-revision';
 
 const PROGRAM_ID = 'prog-upper-specialisation';
 
@@ -57,27 +60,21 @@ const TEMPLATES: TemplateSpec[] = [
     id: 'tmpl-upper-a',
     name: 'A · Chest, Shoulders and Abs',
     goal: 'hypertrophy',
-    estimatedDurationMinutes: 30,
-    notes: `${SESSION_RULES} Monday. Priorities are upper chest, lateral delts, and abs.`,
+    estimatedDurationMinutes: 32,
+    notes: `${SESSION_RULES} Monday. Priorities are upper chest, shoulder width, and abs.`,
     dayOfWeek: 1,
     exercises: [
       {
         exerciseId: 'ex-db-incline-bench',
         restSeconds: 120,
-        notes: 'Upper chest. Stable incline only. Leave 1–2 reps. This is the main strength lift today.',
-        sets: sets(2, 6, 10, 2),
-      },
-      {
-        exerciseId: 'ex-db-squeeze-press',
-        restSeconds: 75,
-        notes: 'Flat bench. Press the dumbbells together through the whole set. Leave 1 rep.',
-        sets: sets(1, 10, 15, 1),
+        notes: 'Upper chest. Stable incline only. Leave 1–2 reps. Stay at this weight and add reps across 6–12 before you take the next dumbbell.',
+        sets: sets(3, 6, 12, 2),
       },
       {
         exerciseId: 'ex-lateral-raise',
         restSeconds: 60,
-        notes: 'Lateral delts. Strict raise, no swing. Leave 0–1 reps, and only take the last rep if it is pain-free.',
-        sets: sets(2, 12, 20, 1),
+        notes: 'Shoulder width. Strict raise, no swing. Leave 0–1 reps, and only take the last rep if it is pain-free.',
+        sets: sets(3, 12, 20, 1),
       },
       {
         exerciseId: 'ex-db-rear-delt-raise',
@@ -110,8 +107,8 @@ const TEMPLATES: TemplateSpec[] = [
       {
         exerciseId: 'ex-pullup',
         restSeconds: 120,
-        notes: 'Strict pull-ups. Comfortable grip, no swing, no added weight. Leave about 2 reps.',
-        sets: sets(2, 5, 10, 2),
+        notes: 'Strict pull-ups. Comfortable grip, no swing, no added weight. Leave about 2 reps. If you cannot get 4 strict reps, use the smallest foot assist that keeps you in range, or a slow lowering from the top. Log those until strict reps reach the range.',
+        sets: sets(2, 4, 12, 2),
       },
       {
         exerciseId: 'ex-db-row',
@@ -131,8 +128,8 @@ const TEMPLATES: TemplateSpec[] = [
     id: 'tmpl-upper-c',
     name: 'C · Chest and Shoulders',
     goal: 'hypertrophy',
-    estimatedDurationMinutes: 30,
-    notes: `${SESSION_RULES} Thursday. Priorities are overall chest, shoulders, and lateral delts.`,
+    estimatedDurationMinutes: 35,
+    notes: `${SESSION_RULES} Thursday. Priorities are chest, shoulder width, and the triceps that fill out the arm.`,
     dayOfWeek: 4,
     exercises: [
       {
@@ -144,20 +141,26 @@ const TEMPLATES: TemplateSpec[] = [
       {
         exerciseId: 'ex-db-shoulder-press',
         restSeconds: 120,
-        notes: 'Seated or standing, whichever is stable. Control the bottom. Leave 1–2 reps.',
-        sets: sets(2, 6, 10, 2),
+        notes: 'Seated or standing, whichever is stable. Control the bottom. Leave 1–2 reps. Add reps across 6–12 before the next dumbbell jump.',
+        sets: sets(2, 6, 12, 2),
       },
       {
         exerciseId: 'ex-lateral-raise',
         restSeconds: 60,
-        notes: 'Lateral delts. Strict raise, no swing. Leave 0–1 reps, and only take the last rep if it is pain-free.',
-        sets: sets(2, 12, 20, 1),
+        notes: 'Shoulder width. Strict raise, no swing. Leave 0–1 reps, and only take the last rep if it is pain-free.',
+        sets: sets(3, 12, 20, 1),
       },
       {
-        exerciseId: 'ex-lateral-raise-partial',
+        exerciseId: 'ex-db-rear-delt-raise',
         restSeconds: 60,
-        notes: 'Optional top-half partials for lateral delts. Skip this if the shoulder is sore or painful. Leave 1 rep.',
-        sets: sets(1, 15, 25, 1),
+        notes: 'Rear delts, second time this week. Hinge and raise. Do not brace your chest on the bench. Leave 1 rep.',
+        sets: sets(1, 12, 20, 1),
+      },
+      {
+        exerciseId: 'ex-db-oh-ext',
+        restSeconds: 60,
+        notes: 'Triceps. One dumbbell overhead, upper arm fixed. Two sets. Skip the exercise if the elbow hurts. Leave 2 reps.',
+        sets: sets(2, 8, 12, 2),
       },
     ],
   },
@@ -165,7 +168,7 @@ const TEMPLATES: TemplateSpec[] = [
     id: 'tmpl-upper-d',
     name: 'D · Back, Arms, Legs and Abs',
     goal: 'hypertrophy',
-    estimatedDurationMinutes: 35,
+    estimatedDurationMinutes: 32,
     notes: `${SESSION_RULES} Saturday. Back and arms first. Legs stay at maintenance so they do not create the fatigue that buried the old PPL.`,
     dayOfWeek: 6,
     exercises: [
@@ -190,8 +193,8 @@ const TEMPLATES: TemplateSpec[] = [
       {
         exerciseId: 'ex-db-rdl',
         restSeconds: 90,
-        notes: 'Hamstrings and glutes. Soft knees, hips back. Two sets are programmed; stop after one if the legs are still sore. Leave 2 reps.',
-        sets: sets(2, 8, 12, 2),
+        notes: 'Hamstrings and glutes. One maintenance set so Saturday does not turn into a leg day. Soft knees, hips back. Leave 2 reps.',
+        sets: sets(1, 8, 12, 2),
       },
       {
         exerciseId: 'ex-reverse-crunch',
@@ -234,7 +237,18 @@ export function buildUpperSpecialisationProgramData(now = new Date().toISOString
   const templates: WorkoutTemplate[] = [];
   const templateExercises: TemplateExercise[] = [];
   const setTargets: SetTarget[] = [];
-  const notes: Note[] = [];
+  const notes: Note[] = [
+    {
+      id: UPPER_SPEC_REVISION_NOTE_ID,
+      type: 'general',
+      targetId: PROGRAM_ID,
+      content: UPPER_SPEC_REVISION,
+      showNextTime: false,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: now,
+    },
+  ];
 
   for (const t of TEMPLATES) {
     templates.push({
@@ -291,7 +305,7 @@ export function buildUpperSpecialisationProgramData(now = new Date().toISOString
     id: PROGRAM_ID,
     name: 'Upper Specialisation (4-Day)',
     description:
-      'High-intensity, low-volume upper specialisation for dumbbells, a flat/incline bench, a pull-up bar, and a dip bar. Monday A, Tuesday B, Thursday C, Saturday D. Chest, lats, lateral delts, and biceps are the priorities. Legs are maintenance. The dip bar is available but unused so dips do not add shoulder or systemic fatigue. Set this program active when you want Today to follow it.',
+      'High-intensity, low-volume upper specialisation for dumbbells, a flat/incline bench, a pull-up bar, and a dip bar. Monday A, Tuesday B, Thursday C, Saturday D. Add reps inside the range, then take the next dumbbell. Chest, lats, side delts, and arms are the priorities. Legs stay at maintenance. Set this program active when you want Today to follow it.',
     isActive: false,
     createdAt: now,
     updatedAt: now,

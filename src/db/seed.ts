@@ -4,6 +4,8 @@ import { EXERCISES } from '@/constants/exercises';
 import { STARTER_PROGRAM_ID, buildStarterProgramData } from '@/constants/starterProgram';
 import {
   UPPER_SPECIALISATION_PROGRAM_ID,
+  UPPER_SPEC_REVISION,
+  UPPER_SPEC_REVISION_NOTE_ID,
   buildUpperSpecialisationProgramData,
 } from '@/constants/upperSpecialisationProgram';
 import type { Exercise, ExerciseMuscle, SetTarget, TemplateExercise } from '@/types/entities';
@@ -136,10 +138,23 @@ export async function seedStarterProgram(): Promise<void> {
 /** 4-day upper specialisation. Leaves an existing active program alone. */
 export async function seedUpperSpecialisationProgram(): Promise<void> {
   const existing = await db.programs.get(UPPER_SPECIALISATION_PROGRAM_ID);
-  if (existing) return;
-
   const data = buildUpperSpecialisationProgramData();
 
+  if (!existing) {
+    await writeUpperSpecialisationProgram(data, false);
+    return;
+  }
+
+  const revision = await db.notes.get(UPPER_SPEC_REVISION_NOTE_ID);
+  if (revision?.content === UPPER_SPEC_REVISION) return;
+
+  await writeUpperSpecialisationProgram(data, true);
+}
+
+async function writeUpperSpecialisationProgram(
+  data: ReturnType<typeof buildUpperSpecialisationProgramData>,
+  preserveExistingProgram: boolean,
+): Promise<void> {
   await db.transaction(
     'rw',
     [
@@ -152,13 +167,30 @@ export async function seedUpperSpecialisationProgram(): Promise<void> {
       db.notes,
     ],
     async () => {
+      const templateIds = data.templates.map(template => template.id);
+      const oldExercises = await db.templateExercises.where('workoutTemplateId').anyOf(templateIds).toArray();
+      if (oldExercises.length > 0) {
+        await db.setTargets.where('templateExerciseId').anyOf(oldExercises.map(exercise => exercise.id)).delete();
+        await db.templateExercises.bulkDelete(oldExercises.map(exercise => exercise.id));
+      }
+
       await db.workoutTemplates.bulkPut(data.templates);
       await db.templateExercises.bulkPut(data.templateExercises);
       await db.setTargets.bulkPut(data.setTargets);
-      await db.programs.put(data.program);
       await db.trainingBlocks.bulkPut(data.blocks);
       await db.blockWorkouts.bulkPut(data.blockWorkouts);
       await db.notes.bulkPut(data.notes);
+
+      if (!preserveExistingProgram) {
+        const hasActive = (await db.programs.filter(program => program.isActive === true).count()) > 0;
+        await db.programs.put({ ...data.program, isActive: hasActive ? false : data.program.isActive });
+        return;
+      }
+
+      await db.programs.update(UPPER_SPECIALISATION_PROGRAM_ID, {
+        description: data.program.description,
+        updatedAt: data.program.updatedAt,
+      });
     },
   );
 }

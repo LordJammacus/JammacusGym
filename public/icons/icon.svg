@@ -1,4 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="64" fill="#1a1a1a"/>
-  <text x="256" y="320" text-anchor="middle" font-family="system-ui, sans-serif" font-size="240" font-weight="bold" fill="#3b82f6">G</text>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="46%" r="62%">
+      <stop offset="0%" stop-color="#D6FF2A" stop-opacity="0.34"/>
+      <stop offset="48%" stop-color="#8CFF3A" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#101010" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bolt" x1="32%" y1="0%" x2="68%" y2="100%">
+      <stop offset="0%" stop-color="#F7FF86"/>
+      <stop offset="58%" stop-color="#D6FF1A"/>
+      <stop offset="100%" stop-color="#FF4E12"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#101010"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <path fill="url(#bolt)" d="M124 300 L312 68 L244 236 H404 L198 452 L276 300 Z"/>
 </svg>
