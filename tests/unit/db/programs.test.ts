@@ -255,6 +255,6 @@ describe('listWorkoutGroups', () => {
       blockId: null,
       templateIds: [],
     });
-    expect(groups.at(-1)?.id).toBe(NO_PROGRAM_GROUP_ID);
+    expect(groups[groups.length - 1]?.id).toBe(NO_PROGRAM_GROUP_ID);
   });
 });
