@@ -122,6 +122,83 @@ export async function reorderBlockWorkouts(workouts: { id: string; orderIndex: n
   });
 }
 
+/** Workouts that are not on any live program's rotation. */
+export const NO_PROGRAM_GROUP_ID = 'none';
+
+export interface WorkoutGroup {
+  id: string;
+  label: string;
+  programId: string | null;
+  blockId: string | null;
+  isActive: boolean;
+  templateIds: string[];
+}
+
+/**
+ * Groups live templates by program, and by block when a program has more than one.
+ * Templates that are not on a live program land in the No program group.
+ */
+export async function listWorkoutGroups(): Promise<WorkoutGroup[]> {
+  const programs = (await getAllPrograms()).sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  const liveTemplates = await db.workoutTemplates.filter(t => t.archivedAt === null).toArray();
+  const liveIds = new Set(liveTemplates.map(t => t.id));
+  const assigned = new Set<string>();
+  const groups: WorkoutGroup[] = [];
+
+  for (const program of programs) {
+    const blocks = await getBlocksForProgram(program.id);
+    if (blocks.length === 0) {
+      groups.push({
+        id: `program:${program.id}`,
+        label: program.name,
+        programId: program.id,
+        blockId: null,
+        isActive: program.isActive,
+        templateIds: [],
+      });
+      continue;
+    }
+
+    const splitByBlock = blocks.length > 1;
+    for (const [index, block] of blocks.entries()) {
+      const workouts = await getBlockWorkouts(block.id);
+      const templateIds: string[] = [];
+      for (const bw of workouts) {
+        if (!liveIds.has(bw.workoutTemplateId) || templateIds.includes(bw.workoutTemplateId)) continue;
+        templateIds.push(bw.workoutTemplateId);
+        assigned.add(bw.workoutTemplateId);
+      }
+      groups.push({
+        id: `block:${block.id}`,
+        label: splitByBlock ? `${program.name} · ${block.name}` : program.name,
+        programId: program.id,
+        blockId: block.id,
+        isActive: program.isActive && index === 0,
+        templateIds,
+      });
+    }
+  }
+
+  const looseIds = liveTemplates
+    .filter(t => !assigned.has(t.id))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(t => t.id);
+
+  groups.push({
+    id: NO_PROGRAM_GROUP_ID,
+    label: 'No program',
+    programId: null,
+    blockId: null,
+    isActive: false,
+    templateIds: looseIds,
+  });
+
+  return groups;
+}
+
 // --- Next Workout Logic ---
 
 export async function determineNextWorkout(programId: string): Promise<{
