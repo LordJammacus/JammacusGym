@@ -8,6 +8,12 @@ import {
   UPPER_SPEC_REVISION_NOTE_ID,
   buildUpperSpecialisationProgramData,
 } from '@/constants/upperSpecialisationProgram';
+import {
+  JIMMY_COMMERCIAL_PROGRAM_ID,
+  JIMMY_GYM_REVISION,
+  JIMMY_GYM_REVISION_NOTE_ID,
+  buildCommercialGymProgramData,
+} from '@/constants/commercialGymProgram';
 import type { Exercise, ExerciseMuscle, SetTarget, TemplateExercise } from '@/types/entities';
 
 export async function seedDatabase(): Promise<void> {
@@ -15,6 +21,7 @@ export async function seedDatabase(): Promise<void> {
   await ensureMissingCatalogExercises();
   await seedStarterProgram();
   await seedUpperSpecialisationProgram();
+  await seedCommercialGymProgram();
   await patchStarterPushShoulderPress();
   await patchStarterPushDipsToKickbacks();
 }
@@ -188,6 +195,66 @@ async function writeUpperSpecialisationProgram(
       }
 
       await db.programs.update(UPPER_SPECIALISATION_PROGRAM_ID, {
+        description: data.program.description,
+        updatedAt: data.program.updatedAt,
+      });
+    },
+  );
+}
+
+/** 4-day commercial gym split. Leaves an existing active program alone. */
+export async function seedCommercialGymProgram(): Promise<void> {
+  const existing = await db.programs.get(JIMMY_COMMERCIAL_PROGRAM_ID);
+  const data = buildCommercialGymProgramData();
+
+  if (!existing) {
+    await writeCommercialGymProgram(data, false);
+    return;
+  }
+
+  const revision = await db.notes.get(JIMMY_GYM_REVISION_NOTE_ID);
+  if (revision?.content === JIMMY_GYM_REVISION) return;
+
+  await writeCommercialGymProgram(data, true);
+}
+
+async function writeCommercialGymProgram(
+  data: ReturnType<typeof buildCommercialGymProgramData>,
+  preserveExistingProgram: boolean,
+): Promise<void> {
+  await db.transaction(
+    'rw',
+    [
+      db.workoutTemplates,
+      db.templateExercises,
+      db.setTargets,
+      db.programs,
+      db.trainingBlocks,
+      db.blockWorkouts,
+      db.notes,
+    ],
+    async () => {
+      const templateIds = data.templates.map(template => template.id);
+      const oldExercises = await db.templateExercises.where('workoutTemplateId').anyOf(templateIds).toArray();
+      if (oldExercises.length > 0) {
+        await db.setTargets.where('templateExerciseId').anyOf(oldExercises.map(exercise => exercise.id)).delete();
+        await db.templateExercises.bulkDelete(oldExercises.map(exercise => exercise.id));
+      }
+
+      await db.workoutTemplates.bulkPut(data.templates);
+      await db.templateExercises.bulkPut(data.templateExercises);
+      await db.setTargets.bulkPut(data.setTargets);
+      await db.trainingBlocks.bulkPut(data.blocks);
+      await db.blockWorkouts.bulkPut(data.blockWorkouts);
+      await db.notes.bulkPut(data.notes);
+
+      if (!preserveExistingProgram) {
+        const hasActive = (await db.programs.filter(program => program.isActive === true).count()) > 0;
+        await db.programs.put({ ...data.program, isActive: hasActive ? false : data.program.isActive });
+        return;
+      }
+
+      await db.programs.update(JIMMY_COMMERCIAL_PROGRAM_ID, {
         description: data.program.description,
         updatedAt: data.program.updatedAt,
       });
