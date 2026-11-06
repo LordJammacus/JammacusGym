@@ -46,7 +46,7 @@ describe('commercial gym program', () => {
     const sessionNotes = data.notes.filter(n => n.type === 'workout_template');
     expect(sessionNotes).toHaveLength(4);
     expect(sessionNotes.every(n => n.showNextTime)).toBe(true);
-    expect(data.notes.find(n => n.id === JIMMY_GYM_REVISION_NOTE_ID)?.content).toBe('1');
+    expect(data.notes.find(n => n.id === JIMMY_GYM_REVISION_NOTE_ID)?.content).toBe('2');
   });
 
   it('only uses catalog exercises and working sets', () => {
@@ -55,14 +55,14 @@ describe('commercial gym program', () => {
     }
     expect(data.setTargets.every(s => s.setType === 'working')).toBe(true);
     expect(data.templateExercises.some(te => te.exerciseId === 'ex-reverse-crunch')).toBe(false);
+    expect(data.templateExercises.some(te => te.exerciseId === 'ex-bb-incline-bench')).toBe(false);
     expect(data.templateExercises.some(te => te.exerciseId === 'ex-squat')).toBe(false);
     expect(data.templateExercises.some(te => te.exerciseId === 'ex-deadlift')).toBe(false);
   });
 
-  it('matches day 1 heavy bench, upper chest, shoulders, and knee raises', () => {
+  it('matches day 1 heavy bench, shoulders, and knee raises', () => {
     expect(exerciseOrder('tmpl-jimmy-d1')).toEqual([
       'ex-bb-bench',
-      'ex-bb-incline-bench',
       'ex-lateral-raise',
       'ex-reverse-pec-deck',
       'ex-cable-crunch',
@@ -70,18 +70,13 @@ describe('commercial gym program', () => {
     ]);
 
     const bench = workingSets('tmpl-jimmy-d1', 'ex-bb-bench');
-    expect(bench).toHaveLength(4);
-    expect(bench[0]).toMatchObject({ targetRepMin: 4, targetRepMax: 6, targetRir: 2 });
+    expect(bench).toHaveLength(3);
+    expect(bench[0]).toMatchObject({ targetRepMin: 3, targetRepMax: 5, targetRir: 2 });
     const benchTe = data.templateExercises.find(te => te.id === bench[0]!.templateExerciseId)!;
     expect(benchTe.restSeconds).toBe(180);
     expect(benchTe.notes).toContain('60 kg');
-    expect(benchTe.notes).toContain('64 kg');
-
-    const incline = workingSets('tmpl-jimmy-d1', 'ex-bb-incline-bench');
-    expect(incline).toHaveLength(2);
-    expect(incline[0]).toMatchObject({ targetRepMin: 8, targetRepMax: 12, targetRir: 2 });
-    const inclineTe = data.templateExercises.find(te => te.id === incline[0]!.templateExerciseId)!;
-    expect(inclineTe.restSeconds).toBe(150);
+    expect(benchTe.notes).toContain('65 kg');
+    expect(benchTe.notes.toLowerCase()).toContain('one single');
 
     const laterals = workingSets('tmpl-jimmy-d1', 'ex-lateral-raise');
     expect(laterals).toHaveLength(3);
@@ -124,10 +119,17 @@ describe('commercial gym program', () => {
   it('keeps day 3 a shorter second bench day with cable triceps', () => {
     expect(exerciseOrder('tmpl-jimmy-d3')).toEqual([
       'ex-bb-bench',
+      'ex-pec-deck',
       'ex-lateral-raise',
       'ex-reverse-pec-deck',
       'ex-overhead-ext',
     ]);
+
+    const pec = workingSets('tmpl-jimmy-d3', 'ex-pec-deck');
+    expect(pec).toHaveLength(2);
+    expect(pec[0]).toMatchObject({ targetRepMin: 10, targetRepMax: 15, targetRir: 1 });
+    const pecTe = data.templateExercises.find(te => te.id === pec[0]!.templateExerciseId)!;
+    expect(pecTe.restSeconds).toBe(90);
 
     const bench = workingSets('tmpl-jimmy-d3', 'ex-bb-bench');
     expect(bench).toHaveLength(3);
@@ -214,7 +216,6 @@ describe('seedCommercialGymProgram', () => {
     const day1 = await db.templateExercises.where('workoutTemplateId').equals('tmpl-jimmy-d1').sortBy('orderIndex');
     expect(day1.map(te => te.exerciseId)).toEqual([
       'ex-bb-bench',
-      'ex-bb-incline-bench',
       'ex-lateral-raise',
       'ex-reverse-pec-deck',
       'ex-cable-crunch',
@@ -249,7 +250,7 @@ describe('seedCommercialGymProgram', () => {
     expect(exercises.some(te => te.exerciseId === 'ex-reverse-crunch')).toBe(false);
     const bench = exercises.find(te => te.exerciseId === 'ex-bb-bench')!;
     const sets = await db.setTargets.where('templateExerciseId').equals(bench.id).toArray();
-    expect(sets).toHaveLength(4);
+    expect(sets).toHaveLength(3);
 
     await db.templateExercises.update(bench.id, { notes: 'kept' });
     await seedCommercialGymProgram();

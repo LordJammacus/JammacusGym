@@ -19,10 +19,10 @@ import type { SetType, WorkoutGoal, BlockGoal } from '@/types/enums';
  * recovery is not competing with another heavy compound.
  *
  * Rest: 180s heavy bench, 150s other hard compounds, 120s machine rows,
- * 90s leg curls, 75s direct arm work, 60s shoulders and abs, 30s side plank.
+ * 90s leg curls and pec deck, 75s direct arm work, 60s shoulders and abs, 30s side plank.
  */
 
-export const JIMMY_GYM_REVISION = '1';
+export const JIMMY_GYM_REVISION = '2';
 export const JIMMY_GYM_REVISION_NOTE_ID = 'note-jimmy-gym-revision';
 
 const PROGRAM_ID = 'prog-jimmy-commercial';
@@ -80,22 +80,15 @@ const TEMPLATES: TemplateSpec[] = [
     id: 'tmpl-jimmy-d1',
     name: '(Jimmy) Day 1 · Heavy Bench',
     goal: 'strength',
-    estimatedDurationMinutes: 40,
-    notes: `${SESSION_RULES} Day 1. Heavy flat bench is the lift that moves the 90 kg single. Do this when shoulders and elbows feel ready, never the day after Day 3.`,
+    estimatedDurationMinutes: 35,
+    notes: `${SESSION_RULES} Day 1. Heavy flat bench is the only press. Do this when shoulders and elbows feel ready, never the day after Day 3.`,
     exercises: [
       {
         exerciseId: 'ex-bb-bench',
         restSeconds: 180,
         notes:
-          'Flat barbell bench, first exercise. From a 75 kg single start near 60 kg. From an 80 kg single start near 64 kg. Adjust so 4–6 reps leaves 2 in reserve. Warm-up, do not log: empty bar for 10, then about 50%, 70%, and 85% of the working weight for 5, 3, and 1. When all 4 sets hit 6, add 2.5 kg. No max attempts until week 16.',
-        sets: sets(4, 4, 6, 2),
-      },
-      {
-        exerciseId: 'ex-bb-incline-bench',
-        restSeconds: 150,
-        notes:
-          'Upper chest, after the heavy bench so it does not pre-fatigue the main lift. Moderate load. Leave 2 reps. If the next heavy bench stalls, drop this before you drop any flat bench sets.',
-        sets: sets(2, 8, 12, 2),
+          'Flat barbell bench, first and only press. From a 75 kg single start near 60 kg. From an 80 kg single start near 65 kg. Adjust so 3–5 reps leaves 2 in reserve. Warm-up, do not log: empty bar for 10, then about 50%, 70%, and 85% of the working weight for 5, 3, and 1. When all 3 sets hit 5, add 2.5 kg. On the last heavy day of week 16, warm up and take one single. Do not also do the 3×3–5 that day.',
+        sets: sets(3, 3, 5, 2),
       },
       {
         exerciseId: 'ex-lateral-raise',
@@ -166,15 +159,22 @@ const TEMPLATES: TemplateSpec[] = [
     id: 'tmpl-jimmy-d3',
     name: '(Jimmy) Day 3 · Bench and Triceps',
     goal: 'hypertrophy',
-    estimatedDurationMinutes: 32,
-    notes: `${SESSION_RULES} Day 3. Second bench of the week, then cable triceps. Leave at least one full day after Day 1. This session stays shorter so the heavy bench can keep moving.`,
+    estimatedDurationMinutes: 36,
+    notes: `${SESSION_RULES} Day 3. Second bench of the week, pec deck for chest shape, then cable triceps. Leave at least one full day after Day 1.`,
     exercises: [
       {
         exerciseId: 'ex-bb-bench',
         restSeconds: 150,
         notes:
-          'Flat barbell bench, lighter than Day 1. Same warm-up pattern, not logged. Leave 2 reps in the 6–10 range. When all 3 sets hit 10, add 2.5 kg. Do not turn this into another heavy 4–6 day.',
+          'Flat barbell bench, lighter than Day 1. Same warm-up pattern, not logged. Leave 2 reps in the 6–10 range. When all 3 sets hit 10, add 2.5 kg. Do not turn this into another heavy 3–5 day.',
         sets: sets(3, 6, 10, 2),
+      },
+      {
+        exerciseId: 'ex-pec-deck',
+        restSeconds: 90,
+        notes:
+          'Chest shape after the volume bench. Full stretch, then squeeze in front. Leave 1 rep. Keep it light enough that the next heavy bench still feels fast.',
+        sets: sets(2, 10, 15, 1),
       },
       {
         exerciseId: 'ex-lateral-raise',
@@ -258,7 +258,7 @@ const BLOCK = {
   weekCount: 16,
   goal: 'strength' as BlockGoal,
   notes:
-    'Run Day 1 → Day 2 → Day 3 → Day 4 for 16 weeks. A normal week is Day 1, Day 2, rest or easy cardio, Day 3, rest or easy cardio, Day 4, rest. The two bench days need a day off between them. Back days can sit next to a bench day. Keep cardio easy the day before Day 1. Add 2.5 kg on the heavy bench only when every set hits 6 reps. Do not test a max until week 16, and do not add a fifth lifting day. Add a set only on laterals or curls if you are sleeping and the bench is still going up.',
+    'Run Day 1 → Day 2 → Day 3 → Day 4 for 16 weeks. A normal week is Day 1, Day 2, rest or easy cardio, Day 3, rest or easy cardio, Day 4, rest. The two bench days need a day off between them. Back days can sit next to a bench day. Keep cardio easy the day before Day 1. Add 2.5 kg on the heavy bench only when every set hits 5 reps. On the last heavy day of week 16, warm up and take one single, and skip the 3×3–5. Do not add a fifth lifting day. Add a set only on laterals or curls if you are sleeping and the bench is still going up.',
   templateIds: TEMPLATES.map(t => t.id),
 };
 
