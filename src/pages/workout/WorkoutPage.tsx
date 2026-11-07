@@ -15,19 +15,25 @@ import {
 import { generateId } from '@/utils/ids';
 import { useWorkoutStore } from '@/stores/workoutStore';
 
-const GROUP_STORAGE_KEY = 'jammacus.workoutGroup';
+const SPLIT_STORAGE_KEY = 'jammacus.workoutGroup';
+const WORKOUT_STORAGE_KEY = 'jammacus.workoutTemplate';
+const ALL_SPLITS_ID = 'all';
 
-function readStoredGroupId(): string | null {
+const selectClass =
+  'w-full rounded-lg bg-surface-overlay border border-white/10 px-3 py-2.5 text-white min-h-[44px] text-base';
+
+function readStorage(key: string): string | null {
   try {
-    return sessionStorage.getItem(GROUP_STORAGE_KEY);
+    return sessionStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-function storeGroupId(id: string) {
+function writeStorage(key: string, value: string | null) {
   try {
-    sessionStorage.setItem(GROUP_STORAGE_KEY, id);
+    if (value) sessionStorage.setItem(key, value);
+    else sessionStorage.removeItem(key);
   } catch {
     // sessionStorage can throw in private mode; the in-memory selection still works.
   }
@@ -40,21 +46,27 @@ function groupOptionLabel(group: WorkoutGroup): string {
 }
 
 function groupForValue(groups: WorkoutGroup[], value: string | null): WorkoutGroup | undefined {
-  if (!value) return undefined;
+  if (!value || value === ALL_SPLITS_ID) return undefined;
   return groups.find(group => group.id === value || group.templateIds.includes(value));
 }
 
-function defaultSelection(groups: WorkoutGroup[]): string {
-  const active = groups.find(group => group.isActive);
-  const fallback = active ?? groups.find(group => group.id === NO_PROGRAM_GROUP_ID);
-  return fallback?.templateIds[0] ?? fallback?.id ?? NO_PROGRAM_GROUP_ID;
+function defaultSplitId(groups: WorkoutGroup[]): string {
+  return groups.find(group => group.isActive)?.id ?? ALL_SPLITS_ID;
+}
+
+function templatesInSplit(groups: WorkoutGroup[], splitId: string): string[] {
+  if (splitId === ALL_SPLITS_ID) {
+    return groups.flatMap(group => group.templateIds);
+  }
+  return groupForValue(groups, splitId)?.templateIds ?? [];
 }
 
 export function WorkoutPage() {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [groups, setGroups] = useState<WorkoutGroup[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(readStoredGroupId);
+  const [splitId, setSplitId] = useState<string | null>(() => readStorage(SPLIT_STORAGE_KEY));
+  const [workoutId, setWorkoutId] = useState<string | null>(() => readStorage(WORKOUT_STORAGE_KEY));
   const [ready, setReady] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const activeWorkout = useWorkoutStore(s => s.instance);
@@ -66,19 +78,36 @@ export function WorkoutPage() {
     ]);
     setTemplates(t);
     setGroups(g);
-    setSelectedGroupId(current => {
-      const next = current && groupForValue(g, current) ? current : defaultSelection(g);
-      storeGroupId(next);
-      return next;
-    });
+
+    const storedSplit = readStorage(SPLIT_STORAGE_KEY);
+    const nextSplit = storedSplit === ALL_SPLITS_ID || groupForValue(g, storedSplit)
+      ? (storedSplit === ALL_SPLITS_ID ? ALL_SPLITS_ID : groupForValue(g, storedSplit)!.id)
+      : defaultSplitId(g);
+    const pool = templatesInSplit(g, nextSplit);
+    const storedWorkout = readStorage(WORKOUT_STORAGE_KEY);
+    const nextWorkout = storedWorkout && pool.includes(storedWorkout) ? storedWorkout : (pool[0] ?? null);
+
+    setSplitId(nextSplit);
+    setWorkoutId(nextWorkout);
+    writeStorage(SPLIT_STORAGE_KEY, nextSplit);
+    writeStorage(WORKOUT_STORAGE_KEY, nextWorkout);
     setReady(true);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  function selectGroup(id: string) {
-    setSelectedGroupId(id);
-    storeGroupId(id);
+  function selectSplit(nextSplit: string) {
+    const pool = templatesInSplit(groups, nextSplit);
+    const nextWorkout = workoutId && pool.includes(workoutId) ? workoutId : (pool[0] ?? null);
+    setSplitId(nextSplit);
+    setWorkoutId(nextWorkout);
+    writeStorage(SPLIT_STORAGE_KEY, nextSplit);
+    writeStorage(WORKOUT_STORAGE_KEY, nextWorkout);
+  }
+
+  function selectWorkout(id: string) {
+    setWorkoutId(id);
+    writeStorage(WORKOUT_STORAGE_KEY, id);
   }
 
   if (activeWorkout) {
@@ -86,14 +115,17 @@ export function WorkoutPage() {
     return null;
   }
 
-  const selected = groupForValue(groups, selectedGroupId) ?? null;
   const templateById = new Map(templates.map(template => [template.id, template]));
-  const selectValue = selected?.templateIds.includes(selectedGroupId ?? '')
-    ? selectedGroupId!
-    : (selected?.templateIds[0] ?? selected?.id ?? NO_PROGRAM_GROUP_ID);
-  const visible = (selected?.templateIds ?? [])
-    .map(id => templateById.get(id))
-    .filter((template): template is WorkoutTemplate => template !== undefined);
+  const selectedSplit = groupForValue(groups, splitId);
+  const workoutGroups = splitId === ALL_SPLITS_ID
+    ? groups.filter(group => group.templateIds.length > 0)
+    : (selectedSplit ? [selectedSplit] : []);
+  const pool = templatesInSplit(groups, splitId ?? ALL_SPLITS_ID);
+  const selectedTemplate = workoutId ? templateById.get(workoutId) : undefined;
+  const selectedWorkoutGroup = groupForValue(groups, workoutId);
+  const createGroupId = selectedSplit?.id
+    ?? selectedWorkoutGroup?.id
+    ?? NO_PROGRAM_GROUP_ID;
 
   return (
     <div className="p-4 space-y-4">
@@ -111,63 +143,83 @@ export function WorkoutPage() {
             <select
               id="workout-split"
               aria-label="Workout split"
-              value={selectValue}
-              onChange={e => selectGroup(e.target.value)}
-              className="w-full rounded-lg bg-surface-overlay border border-white/10 px-3 py-2.5 text-white min-h-[44px] text-base"
+              value={splitId ?? ALL_SPLITS_ID}
+              onChange={e => selectSplit(e.target.value)}
+              className={selectClass}
             >
+              <option value={ALL_SPLITS_ID}>
+                All splits — {groups.reduce((n, group) => n + group.templateIds.length, 0)} workouts
+              </option>
               {groups.map(group => (
-                <optgroup
-                  key={group.id}
-                  label={group.isActive ? `${group.label} (Active)` : group.label}
-                >
-                  {group.templateIds.length === 0 ? (
-                    <option value={group.id}>
-                      {group.programId ? 'No workouts in this split' : 'No one-off workouts'}
-                    </option>
-                  ) : (
-                    group.templateIds.map(id => (
+                <option key={group.id} value={group.id}>
+                  {groupOptionLabel(group)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="workout-picker" className="text-sm text-zinc-400 font-medium">
+              Workout
+            </label>
+            {pool.length === 0 ? (
+              <select id="workout-picker" aria-label="Workout" disabled className={selectClass} value="">
+                <option value="">
+                  {selectedSplit?.programId ? 'No workouts in this split' : 'No one-off workouts'}
+                </option>
+              </select>
+            ) : (
+              <select
+                id="workout-picker"
+                aria-label="Workout"
+                value={workoutId ?? ''}
+                onChange={e => selectWorkout(e.target.value)}
+                className={selectClass}
+              >
+                {workoutGroups.map(group => (
+                  <optgroup
+                    key={group.id}
+                    label={group.isActive ? `${group.label} (Active)` : group.label}
+                  >
+                    {group.templateIds.map(id => (
                       <option key={id} value={id}>
                         {templateById.get(id)?.name ?? 'Workout'}
                       </option>
-                    ))
-                  )}
-                </optgroup>
-              ))}
-            </select>
-            <p className="text-sm text-zinc-500">
-              {selected?.programId
-                ? selected.label
-                : 'No program — one-off workouts'}
-            </p>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            )}
           </div>
 
-          {visible.length === 0 ? (
+          {selectedTemplate ? (
+            <Card className="active:bg-surface-overlay transition-colors">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  className="text-left flex-1 min-w-0"
+                  onClick={() => navigate(`/workout/template/${selectedTemplate.id}`)}
+                >
+                  <div className="font-medium truncate">{selectedTemplate.name}</div>
+                  <div className="text-sm text-zinc-400 capitalize">{selectedTemplate.goal}</div>
+                  <div className="text-xs text-zinc-500 mt-0.5">
+                    {selectedWorkoutGroup?.programId
+                      ? selectedWorkoutGroup.label
+                      : 'No program'}
+                  </div>
+                </button>
+                <Button size="sm" onClick={() => navigate(`/workout/start/${selectedTemplate.id}`)}>
+                  Start
+                </Button>
+              </div>
+            </Card>
+          ) : (
             <Card>
               <p className="text-zinc-400 text-center py-4">
-                {selected?.programId
+                {selectedSplit?.programId
                   ? 'No workouts in this split yet.'
                   : 'No one-off workouts yet. Create one to train outside a program.'}
               </p>
             </Card>
-          ) : (
-            <div className="space-y-2">
-              {visible.map(template => (
-                <Card key={template.id} className="active:bg-surface-overlay transition-colors">
-                  <div className="flex items-center justify-between">
-                    <button
-                      className="text-left flex-1"
-                      onClick={() => navigate(`/workout/template/${template.id}`)}
-                    >
-                      <div className="font-medium">{template.name}</div>
-                      <div className="text-sm text-zinc-400 capitalize">{template.goal}</div>
-                    </button>
-                    <Button size="sm" onClick={() => navigate(`/workout/start/${template.id}`)}>
-                      Start
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
           )}
         </>
       )}
@@ -175,10 +227,12 @@ export function WorkoutPage() {
       <CreateTemplateModal
         open={showCreate}
         groups={groups}
-        initialGroupId={selected?.id ?? NO_PROGRAM_GROUP_ID}
+        initialGroupId={createGroupId}
         onClose={() => setShowCreate(false)}
-        onCreated={(id) => {
-          selectGroup(id);
+        onCreated={(id, groupId) => {
+          const nextSplit = splitId === ALL_SPLITS_ID ? ALL_SPLITS_ID : groupId;
+          writeStorage(SPLIT_STORAGE_KEY, nextSplit);
+          writeStorage(WORKOUT_STORAGE_KEY, id);
           setShowCreate(false);
           navigate(`/workout/template/${id}`);
         }}
@@ -198,7 +252,7 @@ function CreateTemplateModal({
   groups: WorkoutGroup[];
   initialGroupId: string;
   onClose: () => void;
-  onCreated: (id: string) => void;
+  onCreated: (id: string, groupId: string) => void;
 }) {
   const [name, setName] = useState('');
   const [goal, setGoal] = useState<WorkoutGoal>('hypertrophy');
@@ -232,7 +286,7 @@ function CreateTemplateModal({
       await attachTemplateToGroup(group, id, now);
     }
 
-    onCreated(id);
+    onCreated(id, group?.id ?? NO_PROGRAM_GROUP_ID);
   };
 
   return (
@@ -245,7 +299,7 @@ function CreateTemplateModal({
             id="new-workout-split"
             value={groupId}
             onChange={e => setGroupId(e.target.value)}
-            className="w-full rounded-lg bg-surface-overlay border border-white/10 px-3 py-2.5 text-white min-h-[44px] text-base"
+            className={selectClass}
           >
             {groups.map(group => (
               <option key={group.id} value={group.id}>
@@ -259,7 +313,7 @@ function CreateTemplateModal({
           <select
             value={goal}
             onChange={e => setGoal(e.target.value as WorkoutGoal)}
-            className="w-full rounded-lg bg-surface-overlay border border-white/10 px-3 py-2.5 text-white min-h-[44px]"
+            className={selectClass}
           >
             <option value="hypertrophy">Hypertrophy</option>
             <option value="strength">Strength</option>
